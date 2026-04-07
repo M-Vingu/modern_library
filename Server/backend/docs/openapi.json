@@ -1,0 +1,269 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Modern Library API",
+    "version": "1.0.0",
+    "description": "API documentation for learning, marketplace, AI, partner, and live classroom modules."
+  },
+  "servers": [
+    { "url": "http://localhost:5000" }
+  ],
+  "tags": [
+    { "name": "Past Papers" },
+    { "name": "Marketplace" },
+    { "name": "AI" },
+    { "name": "Partners" },
+    { "name": "Live Classroom" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/past-papers": {
+      "get": {
+        "tags": ["Past Papers"],
+        "summary": "List/search public past papers",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "institution", "in": "query", "schema": { "type": "string" } },
+          { "name": "course", "in": "query", "schema": { "type": "string" } },
+          { "name": "subject", "in": "query", "schema": { "type": "string" } },
+          { "name": "year", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Paginated list of past papers" }
+        }
+      },
+      "post": {
+        "tags": ["Past Papers"],
+        "summary": "Create past paper record with external file URL",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "institution", "course", "subject", "year", "fileUrl"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "institution": { "type": "string" },
+                  "course": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "year": { "type": "integer" },
+                  "fileUrl": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/past-papers/upload/base64": {
+      "post": {
+        "tags": ["Past Papers"],
+        "summary": "Upload past paper content as base64",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "institution",
+                  "course",
+                  "subject",
+                  "year",
+                  "originalFileName",
+                  "contentBase64"
+                ],
+                "properties": {
+                  "title": { "type": "string" },
+                  "institution": { "type": "string" },
+                  "course": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "year": { "type": "integer" },
+                  "originalFileName": { "type": "string" },
+                  "mimeType": { "type": "string" },
+                  "contentBase64": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Uploaded with signed download URL" }
+        }
+      }
+    },
+    "/api/past-papers/{id}/download": {
+      "post": {
+        "tags": ["Past Papers"],
+        "summary": "Generate signed download URL",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Signed URL generated" }
+        }
+      }
+    },
+    "/api/files/past-papers/download": {
+      "get": {
+        "tags": ["Past Papers"],
+        "summary": "Resolve signed token and stream/redirect file",
+        "parameters": [
+          { "name": "token", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "File stream or redirect" } }
+      }
+    },
+    "/api/marketplace": {
+      "get": {
+        "tags": ["Marketplace"],
+        "summary": "List marketplace listings",
+        "responses": { "200": { "description": "Listings" } }
+      },
+      "post": {
+        "tags": ["Marketplace"],
+        "summary": "Create marketplace listing",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/marketplace/{id}/buy": {
+      "post": {
+        "tags": ["Marketplace"],
+        "summary": "Buy a listing",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Purchase successful" } }
+      }
+    },
+    "/api/ai/health": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "AI service health",
+        "responses": { "200": { "description": "Provider status" } }
+      }
+    },
+    "/api/ai/chat": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Chat with AI tutor scaffold",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "AI response" } }
+      }
+    },
+    "/api/partners/onboard": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Partner onboarding request",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Partner request created" } }
+      }
+    },
+    "/api/partners/cab-bookings": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Create cab booking",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Cab booking created" } }
+      }
+    },
+    "/api/partners/accommodations/{listingId}/apply": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Apply for accommodation",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "listingId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "201": { "description": "Application submitted" } }
+      }
+    },
+    "/api/partners/settlements/my": {
+      "get": {
+        "tags": ["Partners"],
+        "summary": "Partner settlement ledger view",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Settlement entries" } }
+      }
+    },
+    "/api/live-classrooms": {
+      "get": {
+        "tags": ["Live Classroom"],
+        "summary": "List live classrooms",
+        "responses": { "200": { "description": "Classrooms list" } }
+      },
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Create classroom",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Classroom created" } }
+      }
+    },
+    "/api/live-classrooms/{classroomId}/sessions": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Create a scheduled live session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "classroomId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "201": { "description": "Session created" } }
+      },
+      "get": {
+        "tags": ["Live Classroom"],
+        "summary": "List classroom sessions",
+        "parameters": [
+          { "name": "classroomId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Session list" } }
+      }
+    },
+    "/api/live-classrooms/sessions/{sessionId}/join": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Join a live session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Join token and room URL" } }
+      }
+    },
+    "/api/live-classrooms/sessions/{sessionId}/attendance": {
+      "get": {
+        "tags": ["Live Classroom"],
+        "summary": "Get session attendance",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Attendance list" } }
+      }
+    }
+  }
+}

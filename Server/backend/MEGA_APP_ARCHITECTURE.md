@@ -15,6 +15,7 @@ This backend is organized as modular domain services under one API:
 - Past papers repository
 - Past paper secure uploads + signed download URLs
 - AI tutor scaffold
+- Live classroom sessions and attendance tracking
 
 3. Student Commerce:
 - Campus marketplace (peer-to-peer)
@@ -30,6 +31,10 @@ This backend is organized as modular domain services under one API:
 - Wallet transactions
 - Transaction history endpoints
 - Partner settlement ledger (gross, commission, payout)
+
+6. API Documentation:
+- OpenAPI 3.0 specification
+- Swagger UI endpoint for developer integration
 
 ## 2. Deployment Topology (Current)
 
@@ -115,7 +120,17 @@ This backend is organized as modular domain services under one API:
 - `GET /api/ai/health`
 - `POST /api/ai/chat` (auth)
 
-4. Partner and mobility/accommodation:
+4. Live classrooms:
+- `GET /api/live-classrooms`
+- `POST /api/live-classrooms` (auth)
+- `GET /api/live-classrooms/:id`
+- `POST /api/live-classrooms/:classroomId/sessions` (auth)
+- `GET /api/live-classrooms/:classroomId/sessions`
+- `POST /api/live-classrooms/sessions/:sessionId/join` (auth)
+- `POST /api/live-classrooms/sessions/:sessionId/leave` (auth)
+- `GET /api/live-classrooms/sessions/:sessionId/attendance` (auth teacher/admin)
+
+5. Partner and mobility/accommodation:
 - `POST /api/partners/onboard` (auth)
 - `GET /api/partners/my` (auth)
 - `GET /api/partners/pending` (admin)
@@ -148,7 +163,15 @@ This backend is organized as modular domain services under one API:
 - free tier for basic chat
 - premium tier for advanced tutoring and grading tools
 
-## 6. Security Architecture
+## 6. API Documentation Endpoints
+
+1. OpenAPI JSON:
+- `GET /api/docs/openapi.json`
+
+2. Swagger UI:
+- `GET /api/docs`
+
+## 7. Security Architecture
 
 1. Perimeter:
 - CORS allowlist
@@ -169,7 +192,7 @@ This backend is organized as modular domain services under one API:
 - race-condition-safe booking patterns in critical modules
 - signed short-lived download URLs for protected files
 
-## 7. Next Build Steps (Recommended)
+## 8. Next Build Steps (Recommended)
 
 1. Live classroom service:
 - WebRTC signaling microservice

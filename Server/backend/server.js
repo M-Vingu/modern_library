@@ -91,6 +91,7 @@ app.use('/api/wallet', require('./routes/walletRoutes'));
 app.use('/api/courses', require('./routes/courseRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/marketplace', require('./routes/marketplaceRoutes'));
+app.use('/api/live-classrooms', require('./routes/liveClassroomRoutes'));
 app.use('/api/rides', require('./routes/rideRoutes'));
 app.use('/api/transport', require('./routes/transportRoutes'));
 app.use('/api/hostels', require('./routes/hostelRoutes'));
@@ -98,6 +99,7 @@ app.use('/api/transactions', require('./routes/transactionRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/partners', require('./routes/partnerRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
+app.use('/api/docs', require('./routes/docsRoutes'));
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 

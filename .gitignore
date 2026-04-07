@@ -7,6 +7,8 @@ Server/backend/.env
 # Dependencies
 node_modules/
 Server/backend/node_modules/
+Server/frontend/my-app/
+Server/frontend/node
 
 # Logs
 *.log

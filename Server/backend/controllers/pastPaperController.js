@@ -6,6 +6,7 @@ const {
   verifyDownloadToken,
   buildSignedDownloadUrl,
   streamLocalFile,
+  getSignedExternalDownloadUrl,
 } = require('../services/pastPaperStorageService');
 
 function canAccessPaper(item, reqUser) {
@@ -234,7 +235,12 @@ async function resolveSignedPastPaperDownload(req, res) {
       return;
     }
 
-    if (item.fileUrl) return res.redirect(item.fileUrl);
+    const externalUrl = await getSignedExternalDownloadUrl({
+      storageProvider: item.storageProvider,
+      fileKey: item.fileKey,
+      fileUrl: item.fileUrl,
+    });
+    if (externalUrl) return res.redirect(externalUrl);
     return res.status(400).json({ message: 'No downloadable resource for this paper' });
   } catch (err) {
     return res.status(400).json({ message: 'Invalid or expired download token' });
