@@ -44,6 +44,15 @@ function emitAck(socket, eventName, payload) {
   });
 }
 
+async function waitFor(predicate, timeoutMs = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('waitFor timeout');
+}
+
 function createModels() {
   const attendance = new Map();
   const session = {
@@ -102,6 +111,7 @@ function createModels() {
         return attendance.get(key) || null;
       },
     },
+    __attendance: attendance,
   };
 }
 
@@ -225,6 +235,114 @@ test('socket join/presence/signaling works end-to-end', async () => {
     teacher.close();
     learner.close();
     outsider.close();
+    await app.close();
+  }
+});
+
+test('socket answer/ice relay symmetry and leave/disconnect attendance updates', async () => {
+  process.env.JWT_SECRET = 'test-secret-live-classroom';
+  delete process.env.JWT_ISSUER;
+  delete process.env.JWT_AUDIENCE;
+  process.env.SOCKET_IO_PATH = '/socket.io';
+
+  const models = createModels();
+  const app = await bootstrapTestServer(models);
+  const teacher = ioClient(app.url, {
+    path: '/socket.io',
+    auth: { token: buildToken(TEACHER_ID, 'user') },
+    transports: ['websocket'],
+    reconnection: false,
+  });
+  const learner = ioClient(app.url, {
+    path: '/socket.io',
+    auth: { token: buildToken(LEARNER_ID, 'user') },
+    transports: ['websocket'],
+    reconnection: false,
+  });
+
+  try {
+    await withTimeout(Promise.all([
+      onceEvent(teacher, 'connect'),
+      onceEvent(learner, 'connect'),
+    ]));
+
+    const teacherJoin = await emitAck(teacher, 'classroom:join-session', { sessionId: SESSION_ID });
+    const learnerJoin = await emitAck(learner, 'classroom:join-session', { sessionId: SESSION_ID });
+    assert.equal(teacherJoin.ok, true);
+    assert.equal(learnerJoin.ok, true);
+
+    const answerToTeacherPromise = onceEvent(teacher, 'webrtc:answer');
+    const answerToLearnerPromise = onceEvent(learner, 'webrtc:answer');
+    const answerAckLearnerToTeacher = await emitAck(learner, 'webrtc:answer', {
+      sessionId: SESSION_ID,
+      targetUserId: TEACHER_ID,
+      signal: { sdp: 'mock-answer-1', type: 'answer' },
+    });
+    const answerAckTeacherToLearner = await emitAck(teacher, 'webrtc:answer', {
+      sessionId: SESSION_ID,
+      targetUserId: LEARNER_ID,
+      signal: { sdp: 'mock-answer-2', type: 'answer' },
+    });
+    assert.equal(answerAckLearnerToTeacher.ok, true);
+    assert.equal(answerAckLearnerToTeacher.delivered, 1);
+    assert.equal(answerAckTeacherToLearner.ok, true);
+    assert.equal(answerAckTeacherToLearner.delivered, 1);
+
+    const answerToTeacher = await withTimeout(answerToTeacherPromise);
+    const answerToLearner = await withTimeout(answerToLearnerPromise);
+    assert.equal(answerToTeacher.fromUserId, LEARNER_ID);
+    assert.equal(answerToTeacher.signal.type, 'answer');
+    assert.equal(answerToLearner.fromUserId, TEACHER_ID);
+    assert.equal(answerToLearner.signal.type, 'answer');
+
+    const iceToTeacherPromise = onceEvent(teacher, 'webrtc:ice-candidate');
+    const iceToLearnerPromise = onceEvent(learner, 'webrtc:ice-candidate');
+    const iceAckLearnerToTeacher = await emitAck(learner, 'webrtc:ice-candidate', {
+      sessionId: SESSION_ID,
+      targetUserId: TEACHER_ID,
+      signal: { candidate: 'cand-1', sdpMid: '0', sdpMLineIndex: 0 },
+    });
+    const iceAckTeacherToLearner = await emitAck(teacher, 'webrtc:ice-candidate', {
+      sessionId: SESSION_ID,
+      targetUserId: LEARNER_ID,
+      signal: { candidate: 'cand-2', sdpMid: '0', sdpMLineIndex: 0 },
+    });
+    assert.equal(iceAckLearnerToTeacher.ok, true);
+    assert.equal(iceAckLearnerToTeacher.delivered, 1);
+    assert.equal(iceAckTeacherToLearner.ok, true);
+    assert.equal(iceAckTeacherToLearner.delivered, 1);
+
+    const iceToTeacher = await withTimeout(iceToTeacherPromise);
+    const iceToLearner = await withTimeout(iceToLearnerPromise);
+    assert.equal(iceToTeacher.fromUserId, LEARNER_ID);
+    assert.equal(iceToTeacher.signal.candidate, 'cand-1');
+    assert.equal(iceToLearner.fromUserId, TEACHER_ID);
+    assert.equal(iceToLearner.signal.candidate, 'cand-2');
+
+    const leaveAck = await emitAck(teacher, 'classroom:leave-session', { sessionId: SESSION_ID });
+    assert.equal(leaveAck.ok, true);
+
+    const teacherAttendanceKey = `${SESSION_ID}:${TEACHER_ID}`;
+    await waitFor(() => {
+      const rec = models.__attendance.get(teacherAttendanceKey);
+      return rec && rec.leftAt instanceof Date;
+    });
+    const teacherRec = models.__attendance.get(teacherAttendanceKey);
+    assert.ok(teacherRec.leftAt instanceof Date);
+    assert.ok(teacherRec.durationSeconds >= 0);
+
+    learner.close();
+    const learnerAttendanceKey = `${SESSION_ID}:${LEARNER_ID}`;
+    await waitFor(() => {
+      const rec = models.__attendance.get(learnerAttendanceKey);
+      return rec && rec.leftAt instanceof Date;
+    });
+    const learnerRec = models.__attendance.get(learnerAttendanceKey);
+    assert.ok(learnerRec.leftAt instanceof Date);
+    assert.ok(learnerRec.durationSeconds >= 0);
+  } finally {
+    teacher.close();
+    learner.close();
     await app.close();
   }
 });
