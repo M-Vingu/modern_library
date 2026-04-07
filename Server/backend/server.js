@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const passport = require('passport');
@@ -13,8 +14,10 @@ const { createRateLimiter } = require('./middleware/rateLimiter');
 
 const User = require('./models/user');
 const Wallet = require('./models/wallet');
+const { initLiveClassroomSocketServer } = require('./realtime/liveClassroomSocket');
 
 const app = express();
+const server = http.createServer(app);
 const SECRET = process.env.JWT_SECRET;
 const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
@@ -130,6 +133,7 @@ app.use((err, _req, res, _next) => {
   }
   return res.status(500).json({ message: 'Internal server error' });
 });
+initLiveClassroomSocketServer(server, { allowedOrigins });
 
 mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 10000,
@@ -138,7 +142,7 @@ mongoose.connect(process.env.MONGO_URI, {
   .then(() => {
     console.log('MongoDB Connected');
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => {
     console.error('MongoDB connection failed');

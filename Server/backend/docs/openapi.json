@@ -224,6 +224,14 @@
         "responses": { "201": { "description": "Classroom created" } }
       }
     },
+    "/api/live-classrooms/realtime/config": {
+      "get": {
+        "tags": ["Live Classroom"],
+        "summary": "Get Socket.IO + WebRTC client config",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Realtime signaling config" } }
+      }
+    },
     "/api/live-classrooms/{classroomId}/sessions": {
       "post": {
         "tags": ["Live Classroom"],
@@ -252,6 +260,17 @@
           { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": { "200": { "description": "Join token and room URL" } }
+      }
+    },
+    "/api/live-classrooms/sessions/{sessionId}/leave": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Leave a live session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Leave response with duration" } }
       }
     },
     "/api/live-classrooms/sessions/{sessionId}/attendance": {

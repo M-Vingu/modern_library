@@ -16,6 +16,7 @@ This backend is organized as modular domain services under one API:
 - Past paper secure uploads + signed download URLs
 - AI tutor scaffold
 - Live classroom sessions and attendance tracking
+- Realtime classroom transport (Socket.IO + WebRTC signaling relay)
 
 3. Student Commerce:
 - Campus marketplace (peer-to-peer)
@@ -123,12 +124,16 @@ This backend is organized as modular domain services under one API:
 4. Live classrooms:
 - `GET /api/live-classrooms`
 - `POST /api/live-classrooms` (auth)
+- `GET /api/live-classrooms/realtime/config` (auth)
 - `GET /api/live-classrooms/:id`
 - `POST /api/live-classrooms/:classroomId/sessions` (auth)
 - `GET /api/live-classrooms/:classroomId/sessions`
 - `POST /api/live-classrooms/sessions/:sessionId/join` (auth)
 - `POST /api/live-classrooms/sessions/:sessionId/leave` (auth)
 - `GET /api/live-classrooms/sessions/:sessionId/attendance` (auth teacher/admin)
+- Socket events:
+- `classroom:join-session`, `classroom:leave-session`
+- `webrtc:offer`, `webrtc:answer`, `webrtc:ice-candidate`
 
 5. Partner and mobility/accommodation:
 - `POST /api/partners/onboard` (auth)
@@ -195,8 +200,8 @@ This backend is organized as modular domain services under one API:
 ## 8. Next Build Steps (Recommended)
 
 1. Live classroom service:
-- WebRTC signaling microservice
-- scheduled rooms + attendance logs
+- media recording/archival pipeline
+- moderator controls (mute, remove participant, lock room)
 
 2. AI grading workflow:
 - upload scripts

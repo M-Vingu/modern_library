@@ -9,6 +9,15 @@ function isAdmin(req) {
   return req.user?.role === 'admin';
 }
 
+function canAccessClassroom(classroom, req) {
+  if (isAdmin(req)) return true;
+  if (classroom.visibility === 'public') return true;
+  if (classroom.createdBy.toString() === req.user.id) return true;
+  if (classroom.teacherIds.some((id) => id.toString() === req.user.id)) return true;
+  if (classroom.learnerIds.some((id) => id.toString() === req.user.id)) return true;
+  return false;
+}
+
 function buildRoomId(sessionId) {
   return `class-${sessionId}-${crypto.randomBytes(4).toString('hex')}`;
 }
@@ -129,6 +138,9 @@ async function joinLiveSession(req, res) {
 
     const classroom = await LiveClassroom.findById(session.classroomId);
     if (!classroom) return res.status(404).json({ message: 'Classroom not found' });
+    if (!canAccessClassroom(classroom, req)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
 
     const isTeacher = classroom.teacherIds.some((id) => id.toString() === req.user.id);
     const role = isTeacher ? 'teacher' : 'learner';
@@ -214,10 +226,39 @@ async function getSessionAttendance(req, res) {
   }
 }
 
+function getRealtimeConfig(_req, res) {
+  const rawIceServers = process.env.WEBRTC_ICE_SERVERS_JSON;
+  let iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
+
+  if (rawIceServers) {
+    try {
+      const parsed = JSON.parse(rawIceServers);
+      if (Array.isArray(parsed) && parsed.length > 0) iceServers = parsed;
+    } catch (_err) {
+      // Fall back to default STUN if env value is malformed.
+    }
+  }
+
+  res.json({
+    socketPath: process.env.SOCKET_IO_PATH || '/socket.io',
+    events: {
+      connect: 'classroom:connected',
+      join: 'classroom:join-session',
+      leave: 'classroom:leave-session',
+      presence: 'classroom:presence-updated',
+      offer: 'webrtc:offer',
+      answer: 'webrtc:answer',
+      iceCandidate: 'webrtc:ice-candidate',
+    },
+    iceServers,
+  });
+}
+
 module.exports = {
   createClassroom,
   listClassrooms,
   getClassroomById,
+  getRealtimeConfig,
   createClassroomSession,
   listClassroomSessions,
   joinLiveSession,

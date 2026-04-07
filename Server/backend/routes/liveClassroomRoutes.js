@@ -6,6 +6,7 @@ const {
   createClassroom,
   listClassrooms,
   getClassroomById,
+  getRealtimeConfig,
   createClassroomSession,
   listClassroomSessions,
   joinLiveSession,
@@ -14,6 +15,7 @@ const {
 } = require('../controllers/liveClassroomController');
 
 router.get('/', listClassrooms);
+router.get('/realtime/config', protect, getRealtimeConfig);
 router.get('/:id', getClassroomById);
 router.post('/', protect, createClassroom);
 router.post('/:classroomId/sessions', protect, createClassroomSession);
