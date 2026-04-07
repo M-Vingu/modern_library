@@ -8,6 +8,11 @@ const ClassroomAttendance = require('../models/ClassroomAttendance');
 
 const sessionPresence = new Map();
 const userSockets = new Map();
+let models = {
+  LiveSession,
+  LiveClassroom,
+  ClassroomAttendance,
+};
 
 function safeAck(ack, payload) {
   if (typeof ack === 'function') ack(payload);
@@ -57,7 +62,7 @@ async function markAttendanceJoin({ session, classroom, userId }) {
   const isTeacher = classroom.teacherIds.some((id) => id.toString() === userId);
   const role = isTeacher ? 'teacher' : 'learner';
   const now = new Date();
-  await ClassroomAttendance.findOneAndUpdate(
+  await models.ClassroomAttendance.findOneAndUpdate(
     { sessionId: session._id, userId },
     {
       $setOnInsert: {
@@ -72,7 +77,7 @@ async function markAttendanceJoin({ session, classroom, userId }) {
 }
 
 async function markAttendanceLeave({ sessionId, userId }) {
-  const record = await ClassroomAttendance.findOne({ sessionId, userId });
+  const record = await models.ClassroomAttendance.findOne({ sessionId, userId });
   if (!record) return;
 
   const now = new Date();
@@ -119,9 +124,9 @@ async function joinLiveSessionRoom(io, socket, payload, ack) {
   }
 
   const identity = socket.data.identity;
-  const session = await LiveSession.findById(sessionId);
+  const session = await models.LiveSession.findById(sessionId);
   if (!session) return safeAck(ack, { ok: false, message: 'Session not found' });
-  const classroom = await LiveClassroom.findById(session.classroomId);
+  const classroom = await models.LiveClassroom.findById(session.classroomId);
   if (!classroom) return safeAck(ack, { ok: false, message: 'Classroom not found' });
 
   if (!canJoinClassroom(classroom, identity)) {
@@ -210,7 +215,19 @@ function relaySignal(io, socket, eventName, payload, ack) {
   return safeAck(ack, { ok: true, delivered });
 }
 
-function initLiveClassroomSocketServer(server, { allowedOrigins }) {
+function resetLiveClassroomSocketState() {
+  sessionPresence.clear();
+  userSockets.clear();
+}
+
+function initLiveClassroomSocketServer(server, { allowedOrigins, modelOverrides }) {
+  models = {
+    LiveSession,
+    LiveClassroom,
+    ClassroomAttendance,
+    ...(modelOverrides || {}),
+  };
+  resetLiveClassroomSocketState();
   const socketPath = process.env.SOCKET_IO_PATH || '/socket.io';
   const io = new Server(server, {
     path: socketPath,
@@ -276,4 +293,4 @@ function initLiveClassroomSocketServer(server, { allowedOrigins }) {
   return io;
 }
 
-module.exports = { initLiveClassroomSocketServer };
+module.exports = { initLiveClassroomSocketServer, resetLiveClassroomSocketState };
