@@ -1,13 +1,16 @@
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
+const { createAdapter } = require('@socket.io/redis-adapter');
 
 const LiveSession = require('../models/LiveSession');
 const LiveClassroom = require('../models/LiveClassroom');
 const ClassroomAttendance = require('../models/ClassroomAttendance');
+const { getRedisClient, hasRedisConfigured } = require('../services/redisClient');
 
 const sessionPresence = new Map();
 const userSockets = new Map();
+const signalRateMemory = new Map();
 let models = {
   LiveSession,
   LiveClassroom,
@@ -58,6 +61,13 @@ function canJoinClassroom(classroom, identity) {
   return false;
 }
 
+function getSignalLimits() {
+  const windowSec = Math.max(1, Number(process.env.SIGNAL_RATE_LIMIT_WINDOW_SEC || 10));
+  const perSocket = Math.max(1, Number(process.env.SIGNAL_RATE_LIMIT_PER_SOCKET || 60));
+  const perRoom = Math.max(1, Number(process.env.SIGNAL_RATE_LIMIT_PER_ROOM || 500));
+  return { windowSec, perSocket, perRoom };
+}
+
 async function markAttendanceJoin({ session, classroom, userId }) {
   const isTeacher = classroom.teacherIds.some((id) => id.toString() === userId);
   const role = isTeacher ? 'teacher' : 'learner';
@@ -92,19 +102,6 @@ function getOrCreateSet(map, key) {
   return map.get(key);
 }
 
-function attachPresence({ socket, sessionId }) {
-  const socketIds = getOrCreateSet(sessionPresence, sessionId);
-  socketIds.add(socket.id);
-}
-
-function detachPresence({ socket, sessionId }) {
-  const socketIds = sessionPresence.get(sessionId);
-  if (!socketIds) return 0;
-  socketIds.delete(socket.id);
-  if (socketIds.size === 0) sessionPresence.delete(sessionId);
-  return socketIds.size;
-}
-
 function attachUserSocket(identity, socketId) {
   const set = getOrCreateSet(userSockets, identity.userId);
   set.add(socketId);
@@ -115,6 +112,77 @@ function detachUserSocket(identity, socketId) {
   if (!set) return;
   set.delete(socketId);
   if (set.size === 0) userSockets.delete(identity.userId);
+}
+
+async function attachPresence({ socket, sessionId }) {
+  const redis = hasRedisConfigured() ? getRedisClient() : null;
+  if (redis) {
+    const key = `presence:session:${sessionId}:sockets`;
+    await redis.sadd(key, socket.id);
+    await redis.expire(key, 4 * 60 * 60);
+    const count = await redis.scard(key);
+    return Number(count || 0);
+  }
+
+  const socketIds = getOrCreateSet(sessionPresence, sessionId);
+  socketIds.add(socket.id);
+  return socketIds.size;
+}
+
+async function detachPresence({ socket, sessionId }) {
+  const redis = hasRedisConfigured() ? getRedisClient() : null;
+  if (redis) {
+    const key = `presence:session:${sessionId}:sockets`;
+    await redis.srem(key, socket.id);
+    const count = await redis.scard(key);
+    return Number(count || 0);
+  }
+
+  const socketIds = sessionPresence.get(sessionId);
+  if (!socketIds) return 0;
+  socketIds.delete(socket.id);
+  if (socketIds.size === 0) sessionPresence.delete(sessionId);
+  return socketIds.size;
+}
+
+function checkMemoryRateLimit(key, limit, windowMs) {
+  const now = Date.now();
+  const entry = signalRateMemory.get(key);
+  if (!entry || entry.resetAt <= now) {
+    signalRateMemory.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count += 1;
+  signalRateMemory.set(key, entry);
+  return true;
+}
+
+async function checkRateLimit(sessionId, socketId) {
+  const { windowSec, perSocket, perRoom } = getSignalLimits();
+  const windowMs = windowSec * 1000;
+  const redis = hasRedisConfigured() ? getRedisClient() : null;
+
+  if (redis) {
+    const socketKey = `ratelimit:signal:socket:${socketId}`;
+    const roomKey = `ratelimit:signal:room:${sessionId}`;
+
+    const socketCount = await redis.incr(socketKey);
+    if (socketCount === 1) await redis.expire(socketKey, windowSec);
+    if (socketCount > perSocket) return { ok: false, scope: 'socket' };
+
+    const roomCount = await redis.incr(roomKey);
+    if (roomCount === 1) await redis.expire(roomKey, windowSec);
+    if (roomCount > perRoom) return { ok: false, scope: 'room' };
+
+    return { ok: true };
+  }
+
+  const socketOk = checkMemoryRateLimit(`socket:${socketId}`, perSocket, windowMs);
+  if (!socketOk) return { ok: false, scope: 'socket' };
+  const roomOk = checkMemoryRateLimit(`room:${sessionId}`, perRoom, windowMs);
+  if (!roomOk) return { ok: false, scope: 'room' };
+  return { ok: true };
 }
 
 async function joinLiveSessionRoom(io, socket, payload, ack) {
@@ -141,10 +209,9 @@ async function joinLiveSessionRoom(io, socket, payload, ack) {
   const room = roomForSession(sessionId);
   await socket.join(room);
   socket.data.sessionIds.add(sessionId);
-  attachPresence({ socket, sessionId });
+  const activeParticipants = await attachPresence({ socket, sessionId });
   await markAttendanceJoin({ session, classroom, userId: identity.userId });
 
-  const activeParticipants = sessionPresence.get(sessionId)?.size || 1;
   io.to(room).emit('classroom:presence-updated', {
     sessionId,
     activeParticipants,
@@ -170,7 +237,7 @@ async function leaveLiveSessionRoom(io, socket, payload, ack) {
   const room = roomForSession(sessionId);
   await socket.leave(room);
   socket.data.sessionIds.delete(sessionId);
-  const activeParticipants = detachPresence({ socket, sessionId });
+  const activeParticipants = await detachPresence({ socket, sessionId });
   await markAttendanceLeave({ sessionId, userId: socket.data.identity.userId });
 
   io.to(room).emit('classroom:presence-updated', {
@@ -183,7 +250,7 @@ async function leaveLiveSessionRoom(io, socket, payload, ack) {
   safeAck(ack, { ok: true, sessionId, activeParticipants });
 }
 
-function relaySignal(io, socket, eventName, payload, ack) {
+async function relaySignal(io, socket, eventName, payload, ack) {
   const sessionId = payload?.sessionId;
   const targetUserId = payload?.targetUserId;
   const signal = payload?.signal;
@@ -193,6 +260,11 @@ function relaySignal(io, socket, eventName, payload, ack) {
   }
   if (!socket.data.sessionIds.has(sessionId)) {
     return safeAck(ack, { ok: false, message: 'Join session before signaling' });
+  }
+
+  const rate = await checkRateLimit(sessionId, socket.id);
+  if (!rate.ok) {
+    return safeAck(ack, { ok: false, message: `Rate limit exceeded (${rate.scope})` });
   }
 
   const room = roomForSession(sessionId);
@@ -218,6 +290,7 @@ function relaySignal(io, socket, eventName, payload, ack) {
 function resetLiveClassroomSocketState() {
   sessionPresence.clear();
   userSockets.clear();
+  signalRateMemory.clear();
 }
 
 function initLiveClassroomSocketServer(server, { allowedOrigins, modelOverrides }) {
@@ -241,6 +314,12 @@ function initLiveClassroomSocketServer(server, { allowedOrigins, modelOverrides 
       methods: ['GET', 'POST'],
     },
   });
+
+  if (hasRedisConfigured()) {
+    const pubClient = getRedisClient();
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+  }
 
   io.use((socket, next) => {
     const token = getSocketToken(socket);
@@ -278,13 +357,17 @@ function initLiveClassroomSocketServer(server, { allowedOrigins, modelOverrides 
 
       sessionIds.forEach((sessionId) => {
         const room = roomForSession(sessionId);
-        const activeParticipants = detachPresence({ socket, sessionId });
-        io.to(room).emit('classroom:presence-updated', {
-          sessionId,
-          activeParticipants,
-          userId: identity.userId,
-          action: 'left',
-        });
+        detachPresence({ socket, sessionId })
+          .then((activeParticipants) => {
+            io.to(room).emit('classroom:presence-updated', {
+              sessionId,
+              activeParticipants,
+              userId: identity.userId,
+              action: 'left',
+            });
+          })
+          .catch(() => {});
+
         markAttendanceLeave({ sessionId, userId: identity.userId }).catch(() => {});
       });
     });

@@ -8,6 +8,8 @@ const {
   streamLocalFile,
   getSignedExternalDownloadUrl,
 } = require('../services/pastPaperStorageService');
+const { enqueueFilePostProcessing } = require('../services/jobDispatchService');
+const { writeAuditLog } = require('../services/auditLogService');
 
 function canAccessPaper(item, reqUser) {
   if (item.visibility === 'public') return true;
@@ -109,6 +111,17 @@ async function uploadPastPaper(req, res) {
       uploadedBy: req.user.id,
       visibility: visibility || 'public',
       isVerified: req.user.role === 'admin',
+    });
+    await enqueueFilePostProcessing({
+      pastPaperId: item._id.toString(),
+      fileKey: item.fileKey,
+      provider: item.storageProvider,
+    });
+    await writeAuditLog(req, {
+      action: 'past_paper.uploaded',
+      targetType: 'past_paper',
+      targetId: item._id,
+      metadata: { provider: item.storageProvider, fileSize: item.fileSize },
     });
 
     const token = signDownloadToken({

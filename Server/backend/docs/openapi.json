@@ -9,6 +9,8 @@
     { "url": "http://localhost:5000" }
   ],
   "tags": [
+    { "name": "System" },
+    { "name": "Auth" },
     { "name": "Past Papers" },
     { "name": "Marketplace" },
     { "name": "AI" },
@@ -27,13 +29,67 @@
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "error": { "type": "string" }
+          "success": { "type": "boolean", "example": false },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string", "example": "VALIDATION_ERROR" },
+              "message": { "type": "string", "example": "Request validation failed" },
+              "details": { "type": "object" }
+            }
+          },
+          "requestId": { "type": "string", "example": "a8e29a68-cfca-41e2-97ac-906f7b5131f5" }
         }
       }
     }
   },
   "paths": {
+    "/api/system/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Liveness probe",
+        "responses": { "200": { "description": "Service is alive" } }
+      }
+    },
+    "/api/system/ready": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Readiness probe (DB + dependencies)",
+        "responses": { "200": { "description": "Ready" }, "503": { "description": "Not ready" } }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Rotate refresh token and issue new access token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "New access and refresh token issued" },
+          "401": { "description": "Refresh token invalid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout and revoke tokens",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Logged out" } }
+      }
+    },
     "/api/past-papers": {
       "get": {
         "tags": ["Past Papers"],

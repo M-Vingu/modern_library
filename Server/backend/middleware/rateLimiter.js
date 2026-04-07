@@ -14,6 +14,9 @@ function createRateLimiter({ windowMs, max, keyPrefix = 'global' }) {
     if (entry.count >= max) {
       const retryAfterSec = Math.ceil((entry.expiresAt - now) / 1000);
       res.set('Retry-After', String(retryAfterSec));
+      if (typeof res.fail === 'function') {
+        return res.fail(429, 'RATE_LIMIT_EXCEEDED', 'Too many requests, slow down.', { retryAfterSec });
+      }
       return res.status(429).json({ message: 'Too many requests, slow down.' });
     }
 

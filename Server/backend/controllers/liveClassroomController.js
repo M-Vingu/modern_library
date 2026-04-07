@@ -241,6 +241,11 @@ function getRealtimeConfig(_req, res) {
 
   res.json({
     socketPath: process.env.SOCKET_IO_PATH || '/socket.io',
+    signalRateLimits: {
+      windowSec: Number(process.env.SIGNAL_RATE_LIMIT_WINDOW_SEC || 10),
+      perSocket: Number(process.env.SIGNAL_RATE_LIMIT_PER_SOCKET || 60),
+      perRoom: Number(process.env.SIGNAL_RATE_LIMIT_PER_ROOM || 500),
+    },
     events: {
       connect: 'classroom:connected',
       join: 'classroom:join-session',

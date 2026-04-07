@@ -38,7 +38,14 @@ Each client event supports Socket.IO ACK with:
 - Joining socket room upserts attendance with `leftAt: null`.
 - Leaving/disconnect updates `leftAt` and `durationSeconds`.
 - Session state moves from `scheduled` to `live` on first realtime join.
+- Presence can be Redis-backed for multi-instance deployments (`REDIS_URL` configured).
 
 ## ICE Servers
 - Configure via `WEBRTC_ICE_SERVERS_JSON`:
   - Example: `[{"urls":["stun:stun.l.google.com:19302"]}]`
+
+## Signaling Rate Limits
+- Configurable server-side anti-spam limits:
+  - `SIGNAL_RATE_LIMIT_WINDOW_SEC`
+  - `SIGNAL_RATE_LIMIT_PER_SOCKET`
+  - `SIGNAL_RATE_LIMIT_PER_ROOM`

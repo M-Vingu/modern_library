@@ -20,4 +20,7 @@ const cabBookingSchema = new mongoose.Schema({
   notes: { type: String, trim: true },
 }, { timestamps: true });
 
+cabBookingSchema.index({ userId: 1, createdAt: -1 });
+cabBookingSchema.index({ partnerId: 1, status: 1, createdAt: -1 });
+
 module.exports = mongoose.model('CabBooking', cabBookingSchema);

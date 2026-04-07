@@ -35,5 +35,7 @@ marketplaceListingSchema.index({
   category: 'text',
   tags: 'text',
 });
+marketplaceListingSchema.index({ status: 1, createdAt: -1 });
+marketplaceListingSchema.index({ sellerId: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('MarketplaceListing', marketplaceListingSchema);

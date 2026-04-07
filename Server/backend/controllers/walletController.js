@@ -1,4 +1,6 @@
 const Wallet = require('../models/wallet');
+const mongoose = require('mongoose');
+const { writeAuditLog } = require('../services/auditLogService');
 
 async function createWallet(userId) {
   const existing = await Wallet.findOne({ userId });
@@ -42,6 +44,7 @@ async function addFunds(req, res) {
 }
 
 async function deductFunds(req, res) {
+  const session = await mongoose.startSession();
   try {
     const { amount, description } = req.body;
     const userId = req.user._id;
@@ -51,42 +54,53 @@ async function deductFunds(req, res) {
       return res.status(400).json({ message: 'Invalid amount' });
     }
 
-    const paymentWallet = await Wallet.findOneAndUpdate(
-      { userId, balance: { $gte: parsedAmount } },
-      {
-        $inc: { balance: -parsedAmount },
-        $push: {
-          transactions: {
-            type: 'payment',
-            amount: parsedAmount,
-            description: description || 'Payment',
+    let finalWallet;
+    await session.withTransaction(async () => {
+      const paymentWallet = await Wallet.findOneAndUpdate(
+        { userId, balance: { $gte: parsedAmount } },
+        {
+          $inc: { balance: -parsedAmount },
+          $push: {
+            transactions: {
+              type: 'payment',
+              amount: parsedAmount,
+              description: description || 'Payment',
+            },
           },
         },
-      },
-      { returnDocument: 'after' },
-    );
+        { returnDocument: 'after', session },
+      );
 
-    if (!paymentWallet) {
-      const walletExists = await Wallet.exists({ userId });
-      if (!walletExists) return res.status(404).json({ message: 'Wallet not found' });
-      return res.status(400).json({ message: 'Insufficient balance' });
-    }
+      if (!paymentWallet) {
+        const walletExists = await Wallet.exists({ userId }).session(session);
+        const error = new Error(walletExists ? 'Insufficient balance' : 'Wallet not found');
+        error.status = walletExists ? 400 : 404;
+        throw error;
+      }
 
-    const cashback = parsedAmount * 0.05;
-    const finalWallet = await Wallet.findOneAndUpdate(
-      { userId },
-      {
-        $inc: { balance: cashback },
-        $push: {
-          transactions: {
-            type: 'cashback',
-            amount: cashback,
-            description: 'Cashback reward',
+      const cashback = Number((parsedAmount * 0.05).toFixed(2));
+      finalWallet = await Wallet.findOneAndUpdate(
+        { userId },
+        {
+          $inc: { balance: cashback },
+          $push: {
+            transactions: {
+              type: 'cashback',
+              amount: cashback,
+              description: 'Cashback reward',
+            },
           },
         },
-      },
-      { returnDocument: 'after' },
-    );
+        { returnDocument: 'after', session },
+      );
+    });
+
+    await writeAuditLog(req, {
+      action: 'wallet.payment',
+      targetType: 'wallet',
+      targetId: req.user._id,
+      metadata: { amount: parsedAmount },
+    });
 
     res.json({
       message: 'Payment successful',
@@ -94,7 +108,9 @@ async function deductFunds(req, res) {
       wallet: finalWallet,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
+  } finally {
+    session.endSession();
   }
 }
 

@@ -17,4 +17,7 @@ const accommodationApplicationSchema = new mongoose.Schema({
   reviewNotes: { type: String, trim: true },
 }, { timestamps: true });
 
+accommodationApplicationSchema.index({ userId: 1, createdAt: -1 });
+accommodationApplicationSchema.index({ partnerId: 1, status: 1, createdAt: -1 });
+
 module.exports = mongoose.model('AccommodationApplication', accommodationApplicationSchema);

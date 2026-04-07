@@ -19,4 +19,7 @@ const partnerSchema = new mongoose.Schema({
   verificationNotes: { type: String, trim: true },
 }, { timestamps: true });
 
+partnerSchema.index({ ownerUserId: 1, verificationStatus: 1, createdAt: -1 });
+partnerSchema.index({ businessType: 1, verificationStatus: 1 });
+
 module.exports = mongoose.model('Partner', partnerSchema);

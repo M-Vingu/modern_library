@@ -1,5 +1,8 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const mongoose = require('mongoose');
 const User = require('../models/user');
+const TokenBlocklist = require('../models/TokenBlocklist');
 
 const protect = async (req, res, next) => {
   try {
@@ -9,6 +12,12 @@ const protect = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
+    if (mongoose.connection.readyState === 1) {
+      const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+      const blocked = await TokenBlocklist.findOne({ tokenHash }).lean();
+      if (blocked) return res.status(401).json({ message: 'Token has been revoked' });
+    }
+
     const secret = process.env.JWT_SECRET;
     if (!secret) return res.status(500).json({ message: 'JWT secret not configured' });
     const verifyOptions = {

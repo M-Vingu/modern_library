@@ -6,8 +6,10 @@ This backend is organized as modular domain services under one API:
 
 1. Identity and Security:
 - JWT authentication
+- Refresh-token rotation + token revocation blocklist
 - Role-based authorization (`user`, `admin`)
 - Rate limiting, request sanitization, security headers
+- Request validation layer (Zod) + idempotency keys
 
 2. Learning Core:
 - Books and borrowing
@@ -32,10 +34,16 @@ This backend is organized as modular domain services under one API:
 - Wallet transactions
 - Transaction history endpoints
 - Partner settlement ledger (gross, commission, payout)
+- Audit log events for critical operations (auth, partner approvals, payouts)
 
 6. API Documentation:
 - OpenAPI 3.0 specification
 - Swagger UI endpoint for developer integration
+
+7. Operations and Reliability:
+- Structured logging (`pino` + request IDs)
+- Health/readiness probes (`/api/system/health`, `/api/system/ready`)
+- Redis-backed queue scaffolding (BullMQ) with dead-letter queues
 
 ## 2. Deployment Topology (Current)
 
@@ -50,6 +58,7 @@ This backend is organized as modular domain services under one API:
 3. Authentication:
 - JWT Bearer tokens
 - Optional Google OAuth login flow
+- Optional Redis-backed token/realtime scaling dependencies
 
 ## 3. Data Model (Existing + New)
 
@@ -121,7 +130,13 @@ This backend is organized as modular domain services under one API:
 - `GET /api/ai/health`
 - `POST /api/ai/chat` (auth)
 
-4. Live classrooms:
+4. Auth hardening:
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout` (auth)
+- `POST /api/auth/mfa/challenge` (auth scaffold)
+- `POST /api/auth/mfa/verify` (auth scaffold)
+
+5. Live classrooms:
 - `GET /api/live-classrooms`
 - `POST /api/live-classrooms` (auth)
 - `GET /api/live-classrooms/realtime/config` (auth)
@@ -135,7 +150,7 @@ This backend is organized as modular domain services under one API:
 - `classroom:join-session`, `classroom:leave-session`
 - `webrtc:offer`, `webrtc:answer`, `webrtc:ice-candidate`
 
-5. Partner and mobility/accommodation:
+6. Partner and mobility/accommodation:
 - `POST /api/partners/onboard` (auth)
 - `GET /api/partners/my` (auth)
 - `GET /api/partners/pending` (admin)
@@ -186,6 +201,7 @@ This backend is organized as modular domain services under one API:
 2. Request hardening:
 - sanitization middleware against dangerous keys/operators
 - standardized security headers
+- standardized error envelope with error codes + request IDs
 
 3. Identity and access:
 - JWT verification (issuer/audience optional enforcement)
@@ -196,6 +212,7 @@ This backend is organized as modular domain services under one API:
 - wallet and purchase flows use atomic DB updates/transactions
 - race-condition-safe booking patterns in critical modules
 - signed short-lived download URLs for protected files
+- signaling spam protection via per-socket/per-room rate limits
 
 ## 8. Next Build Steps (Recommended)
 

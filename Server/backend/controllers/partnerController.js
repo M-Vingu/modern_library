@@ -5,6 +5,8 @@ const CabBooking = require('../models/CabBooking');
 const AccommodationListing = require('../models/AccommodationListing');
 const AccommodationApplication = require('../models/AccommodationApplication');
 const SettlementLedger = require('../models/SettlementLedger');
+const { writeAuditLog } = require('../services/auditLogService');
+const { enqueueSettlementGeneration, enqueueNotification } = require('../services/jobDispatchService');
 
 function isAdmin(req) {
   return req.user?.role === 'admin';
@@ -29,7 +31,7 @@ async function createSettlementEntry({
   const commissionAmount = Number((grossAmount * commissionPercent / 100).toFixed(2));
   const partnerPayout = Number((grossAmount - commissionAmount).toFixed(2));
 
-  return SettlementLedger.findOneAndUpdate(
+  const entry = await SettlementLedger.findOneAndUpdate(
     { bookingType, bookingRefId },
     {
       $setOnInsert: {
@@ -48,6 +50,14 @@ async function createSettlementEntry({
     },
     { upsert: true, returnDocument: 'after' },
   );
+  await enqueueSettlementGeneration({
+    settlementId: entry._id.toString(),
+    bookingType,
+    bookingRefId: String(bookingRefId),
+    partnerId: String(partnerId),
+    userId: String(userId),
+  });
+  return entry;
 }
 
 async function createPartnerOnboarding(req, res) {
@@ -120,6 +130,13 @@ async function updatePartnerStatus(req, res) {
       { returnDocument: 'after' },
     );
     if (!item) return res.status(404).json({ message: 'Partner not found' });
+
+    await writeAuditLog(req, {
+      action: 'partner.status.updated',
+      targetType: 'partner',
+      targetId: item._id,
+      metadata: { status, verificationNotes },
+    });
 
     res.json(item);
   } catch (err) {
@@ -229,6 +246,7 @@ async function listMyCabBookings(req, res) {
 }
 
 async function updateCabBookingStatus(req, res) {
+  const dbSession = await mongoose.startSession();
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid cab booking id' });
@@ -248,28 +266,47 @@ async function updateCabBookingStatus(req, res) {
       if (!ownsBooking) return res.status(403).json({ message: 'Forbidden' });
     }
 
-    booking.status = status;
-    if (finalFare !== undefined) booking.finalFare = Number(finalFare);
-    await booking.save();
+    await dbSession.withTransaction(async () => {
+      booking.status = status;
+      if (finalFare !== undefined) booking.finalFare = Number(finalFare);
+      await booking.save({ session: dbSession });
+
+      if (status === 'completed') {
+        const grossAmount = Number(booking.finalFare ?? booking.estimatedFare);
+        if (Number.isFinite(grossAmount) && grossAmount >= 0) {
+          await createSettlementEntry({
+            bookingType: 'cab',
+            bookingRefId: booking._id,
+            partnerId: booking.partnerId,
+            userId: booking.userId,
+            grossAmount,
+            currency: booking.currency || 'KES',
+            notes: 'Auto-created from completed cab booking',
+          });
+        }
+      }
+    });
 
     if (status === 'completed') {
-      const grossAmount = Number(booking.finalFare ?? booking.estimatedFare);
-      if (Number.isFinite(grossAmount) && grossAmount >= 0) {
-        await createSettlementEntry({
-          bookingType: 'cab',
-          bookingRefId: booking._id,
-          partnerId: booking.partnerId,
-          userId: booking.userId,
-          grossAmount,
-          currency: booking.currency || 'KES',
-          notes: 'Auto-created from completed cab booking',
-        });
-      }
+      await writeAuditLog(req, {
+        action: 'partner.cab_booking.completed',
+        targetType: 'cab_booking',
+        targetId: booking._id,
+        metadata: { finalFare: booking.finalFare, estimatedFare: booking.estimatedFare },
+      });
+      await enqueueNotification({
+        userId: String(booking.userId),
+        channel: 'in_app',
+        template: 'cab_booking_completed',
+        data: { bookingId: String(booking._id) },
+      });
     }
 
     res.json(booking);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    dbSession.endSession();
   }
 }
 
@@ -374,6 +411,7 @@ async function listMyAccommodationApplications(req, res) {
 }
 
 async function updateAccommodationApplicationStatus(req, res) {
+  const dbSession = await mongoose.startSession();
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid application id' });
@@ -394,41 +432,61 @@ async function updateAccommodationApplicationStatus(req, res) {
       }
     }
 
-    app.status = status;
-    app.reviewNotes = reviewNotes;
-    await app.save();
+    await dbSession.withTransaction(async () => {
+      app.status = status;
+      app.reviewNotes = reviewNotes;
+      await app.save({ session: dbSession });
 
-    // Reduce inventory once approved (basic scaffold behavior).
-    if (status === 'approved') {
-      await AccommodationListing.findOneAndUpdate(
-        { _id: app.listingId, availableUnits: { $gt: 0 } },
-        { $inc: { availableUnits: -1 } },
-      );
-
-      const listing = await AccommodationListing.findById(app.listingId);
-      if (listing) {
-        const msDay = 24 * 60 * 60 * 1000;
-        const nights = Math.max(
-          1,
-          Math.ceil((new Date(app.checkOutDate).getTime() - new Date(app.checkInDate).getTime()) / msDay),
+      // Reduce inventory once approved (basic scaffold behavior).
+      if (status === 'approved') {
+        await AccommodationListing.findOneAndUpdate(
+          { _id: app.listingId, availableUnits: { $gt: 0 } },
+          { $inc: { availableUnits: -1 } },
+          { session: dbSession },
         );
-        const grossAmount = Number((nights * Number(listing.pricePerNight || 0)).toFixed(2));
 
-        await createSettlementEntry({
-          bookingType: 'accommodation',
-          bookingRefId: app._id,
-          partnerId: app.partnerId,
-          userId: app.userId,
-          grossAmount,
-          currency: listing.currency || 'KES',
-          notes: `Auto-created from approved accommodation application (${nights} night(s))`,
-        });
+        const listing = await AccommodationListing.findById(app.listingId).session(dbSession);
+        if (listing) {
+          const msDay = 24 * 60 * 60 * 1000;
+          const nights = Math.max(
+            1,
+            Math.ceil((new Date(app.checkOutDate).getTime() - new Date(app.checkInDate).getTime()) / msDay),
+          );
+          const grossAmount = Number((nights * Number(listing.pricePerNight || 0)).toFixed(2));
+
+          await createSettlementEntry({
+            bookingType: 'accommodation',
+            bookingRefId: app._id,
+            partnerId: app.partnerId,
+            userId: app.userId,
+            grossAmount,
+            currency: listing.currency || 'KES',
+            notes: `Auto-created from approved accommodation application (${nights} night(s))`,
+          });
+        }
       }
+    });
+
+    if (status === 'approved') {
+      await writeAuditLog(req, {
+        action: 'partner.accommodation_application.approved',
+        targetType: 'accommodation_application',
+        targetId: app._id,
+        metadata: { reviewNotes },
+      });
+      await enqueueNotification({
+        userId: String(app.userId),
+        channel: 'in_app',
+        template: 'accommodation_application_approved',
+        data: { applicationId: String(app._id) },
+      });
     }
 
     res.json(app);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    dbSession.endSession();
   }
 }
 

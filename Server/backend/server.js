@@ -7,14 +7,23 @@ const cors = require('cors');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
+const pinoHttp = require('pino-http');
 
 const securityHeaders = require('./middleware/securityHeaders');
 const sanitizeRequest = require('./middleware/sanitizeMiddleware');
 const { createRateLimiter } = require('./middleware/rateLimiter');
+const requestContext = require('./middleware/requestContext');
+const responseEnvelope = require('./middleware/responseEnvelope');
+const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+const { validateEnv } = require('./config/validateEnv');
+const { logger } = require('./utils/logger');
+const { startWorkers } = require('./jobs/worker');
 
 const User = require('./models/user');
 const Wallet = require('./models/wallet');
 const { initLiveClassroomSocketServer } = require('./realtime/liveClassroomSocket');
+
+validateEnv();
 
 const app = express();
 const server = http.createServer(app);
@@ -40,6 +49,17 @@ if (!SECRET) {
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.use(requestContext);
+app.use(responseEnvelope);
+app.use(pinoHttp({
+  logger,
+  customProps: (req) => ({ requestId: req.requestId }),
+  serializers: {
+    req(request) {
+      return { id: request.requestId, method: request.method, url: request.url };
+    },
+  },
+}));
 app.use(securityHeaders);
 app.use(cors({
   origin: (origin, callback) => {
@@ -50,7 +70,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
 }));
 app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: true, limit: '32kb' }));
@@ -103,6 +123,7 @@ app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/partners', require('./routes/partnerRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
 app.use('/api/docs', require('./routes/docsRoutes'));
+app.use('/api/system', require('./routes/systemRoutes'));
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -123,16 +144,8 @@ app.get('/', (_req, res) => {
   res.send('Modern Library API running...');
 });
 
-app.use((_req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
-
-app.use((err, _req, res, _next) => {
-  if (err?.message === 'Not allowed by CORS') {
-    return res.status(403).json({ message: 'CORS blocked' });
-  }
-  return res.status(500).json({ message: 'Internal server error' });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 initLiveClassroomSocketServer(server, { allowedOrigins });
 
 mongoose.connect(process.env.MONGO_URI, {
@@ -140,14 +153,19 @@ mongoose.connect(process.env.MONGO_URI, {
   connectTimeoutMS: 10000,
 })
   .then(() => {
-    console.log('MongoDB Connected');
+    logger.info('MongoDB Connected');
+    if (process.env.RUN_JOB_WORKER === 'true') {
+      startWorkers();
+      logger.info('Background workers started in API process');
+    }
     const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    server.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
   })
   .catch((err) => {
-    console.error('MongoDB connection failed');
-    console.error('name:', err.name);
-    console.error('message:', err.message);
-    if (err.code) console.error('code:', err.code);
-    if (err.reason?.message) console.error('reason:', err.reason.message);
+    logger.error({
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      reason: err.reason?.message,
+    }, 'MongoDB connection failed');
   });

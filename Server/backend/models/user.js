@@ -56,6 +56,23 @@ const userSchema = new mongoose.Schema({
   referralCode: String,
 
   lastLogin: Date
+,
+  mfaEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  mfaMethod: {
+    type: String,
+    enum: ['none', 'totp', 'email_otp', 'sms_otp'],
+    default: 'none',
+  },
+  mfaSecretRef: {
+    type: String,
+  },
+  mfaBackupCodes: [{
+    type: String,
+    select: false,
+  }]
 
 }, { timestamps: true });
 
