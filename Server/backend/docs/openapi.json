@@ -2,13 +2,21 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Modern Library API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "API docs for Modern Library mega-platform modules (learning, kids, realtime, commerce, compliance, security)."
   },
   "servers": [{ "url": "http://localhost:5000" }],
   "tags": [
     { "name": "System" },
     { "name": "Auth" },
+    { "name": "Users" },
+    { "name": "AI" },
+    { "name": "Books" },
+    { "name": "Courses" },
+    { "name": "Products" },
+    { "name": "Rides" },
+    { "name": "Transport" },
+    { "name": "Hostels" },
     { "name": "Kids" },
     { "name": "Assessment" },
     { "name": "Compliance" },
@@ -43,6 +51,32 @@
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "example": true }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation or malformed request error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication required or token invalid",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not allowed",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
         }
       }
     }
@@ -105,6 +139,125 @@
     },
     "/api/auth/sessions/revoke-all": {
       "post": { "tags": ["Auth"], "summary": "Revoke all sessions", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Revoked all" } } }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout current session",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              },
+              "example": {
+                "refreshToken": "c0f3...6a9"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Logged out" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/users/register": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Legacy register endpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 }
+                }
+              },
+              "example": {
+                "name": "Legacy User",
+                "email": "legacy@example.com",
+                "password": "StrongPassword123!"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Registered" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/users/login": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Legacy login endpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              },
+              "example": {
+                "email": "legacy@example.com",
+                "password": "StrongPassword123!"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Logged in" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/ai/chat": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "AI tutor chat",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": { "type": "string", "minLength": 1 },
+                  "context": { "type": "object" }
+                }
+              },
+              "example": {
+                "message": "Teach me binary search.",
+                "context": { "level": "beginner" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "AI response returned" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
     },
 
     "/api/kids/profiles": {
@@ -210,6 +363,218 @@
     "/api/business/finance/summary": {
       "get": { "tags": ["Business"], "summary": "Finance summary (entitled)", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Summary" }, "402": { "description": "Entitlement required" } } }
     },
+    "/api/books": {
+      "post": {
+        "tags": ["Books"],
+        "summary": "Create a book (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "author"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "author": { "type": "string" },
+                  "genre": { "type": "string" },
+                  "copies": { "type": "integer", "minimum": 0 }
+                }
+              },
+              "example": {
+                "title": "Introduction to Operating Systems",
+                "author": "Silberschatz",
+                "copies": 4
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/books/{id}/borrow": {
+      "post": {
+        "tags": ["Books"],
+        "summary": "Borrow book",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Borrowed" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/books/{id}/return": {
+      "post": {
+        "tags": ["Books"],
+        "summary": "Return book",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Returned" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/courses": {
+      "post": {
+        "tags": ["Courses"],
+        "summary": "Create course (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "price"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "instructor": { "type": "string" },
+                  "price": {
+                    "type": "object",
+                    "required": ["amount"],
+                    "properties": {
+                      "amount": { "type": "number", "minimum": 0 },
+                      "currency": { "type": "string", "enum": ["KES", "USD", "EUR", "GBP"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/courses/{id}/enroll": {
+      "post": {
+        "tags": ["Courses"],
+        "summary": "Enroll to course",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Enrolled" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/products": {
+      "post": {
+        "tags": ["Products"],
+        "summary": "Create product (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "price"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "price": {
+                    "type": "object",
+                    "required": ["amount"],
+                    "properties": {
+                      "amount": { "type": "number", "minimum": 0 },
+                      "currency": { "type": "string", "enum": ["KES", "USD", "EUR", "GBP"] }
+                    }
+                  },
+                  "seller": { "type": "string" },
+                  "stock": { "type": "integer", "minimum": 0 },
+                  "category": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/products/{id}/buy": {
+      "post": {
+        "tags": ["Products"],
+        "summary": "Buy product",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Purchased" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/rides": {
+      "post": {
+        "tags": ["Rides"],
+        "summary": "Create ride (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["from", "to", "price"],
+                "properties": {
+                  "from": { "type": "string" },
+                  "to": { "type": "string" },
+                  "driver": { "type": "string" },
+                  "seats": { "type": "integer", "minimum": 0 },
+                  "price": {
+                    "type": "object",
+                    "required": ["amount"],
+                    "properties": {
+                      "amount": { "type": "number", "minimum": 0 },
+                      "currency": { "type": "string", "enum": ["KES", "USD", "EUR", "GBP"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/transport/{id}/book": {
+      "post": {
+        "tags": ["Transport"],
+        "summary": "Book transport ride",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Booked" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/hostels/{id}/book": {
+      "post": {
+        "tags": ["Hostels"],
+        "summary": "Book hostel room",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Booked" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
 
     "/api/queues/{name}/metrics": {
       "get": {
@@ -225,16 +590,434 @@
         "tags": ["Queues"],
         "summary": "Replay dead-letter job",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Replayed" } }
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "enum": ["settlement-generation", "file-post-processing", "notifications", "retention-sweep"] } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["deadLetterJobId"],
+                "properties": {
+                  "deadLetterJobId": { "type": "string" }
+                }
+              },
+              "example": {
+                "deadLetterJobId": "172"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Replayed" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
       }
     },
 
     "/api/live-classrooms/realtime/config": {
       "get": { "tags": ["Live Classroom"], "summary": "Socket/WebRTC config", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Config" } } }
     },
+    "/api/live-classrooms": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Create classroom",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "teacherIds": { "type": "array", "items": { "type": "string" } },
+                  "learnerIds": { "type": "array", "items": { "type": "string" } },
+                  "visibility": { "type": "string", "enum": ["public", "private"] }
+                }
+              },
+              "example": {
+                "title": "Discrete Mathematics Class A",
+                "subject": "Math",
+                "visibility": "private"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/live-classrooms/{classroomId}/sessions": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Create classroom session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "classroomId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "scheduledAt"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "scheduledAt": { "type": "string", "example": "2026-04-12T09:00:00Z" },
+                  "durationMinutes": { "type": "integer", "minimum": 5, "maximum": 600 },
+                  "provider": { "type": "string", "enum": ["jitsi", "zoom", "custom"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Session created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/live-classrooms/sessions/{sessionId}/join": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Join live session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Joined" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/live-classrooms/sessions/{sessionId}/leave": {
+      "post": {
+        "tags": ["Live Classroom"],
+        "summary": "Leave live session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Left" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/past-papers": {
+      "post": {
+        "tags": ["Past Papers"],
+        "summary": "Create past paper using external file URL",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "institution", "course", "subject", "year", "fileUrl"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "institution": { "type": "string" },
+                  "course": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "year": { "type": "integer", "minimum": 1990, "maximum": 2100 },
+                  "fileUrl": { "type": "string", "format": "uri" },
+                  "visibility": { "type": "string", "enum": ["public", "private"] }
+                }
+              },
+              "example": {
+                "title": "Physics Endterm 2024",
+                "institution": "TVET College",
+                "course": "Mechanical Engineering",
+                "subject": "Physics",
+                "year": 2024,
+                "fileUrl": "https://cdn.example.com/papers/physics-endterm-2024.pdf",
+                "visibility": "public"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/partners/onboard": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Create partner onboarding profile",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["businessType", "businessName", "contactEmail", "contactPhone"],
+                "properties": {
+                  "businessType": { "type": "string", "enum": ["cab", "hotel", "hostel", "mixed"] },
+                  "businessName": { "type": "string" },
+                  "contactEmail": { "type": "string", "format": "email" },
+                  "contactPhone": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/partners/{partnerId}/cabs": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Create cab vehicle",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "partnerId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["plateNumber"],
+                "properties": {
+                  "plateNumber": { "type": "string" },
+                  "vehicleType": { "type": "string", "enum": ["sedan", "van", "bus", "motorbike", "other"] },
+                  "seats": { "type": "integer", "minimum": 1 },
+                  "driverName": { "type": "string" },
+                  "driverPhone": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/partners/{partnerId}/accommodations": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Create accommodation listing",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "partnerId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["listingType", "name", "location", "pricePerNight"],
+                "properties": {
+                  "listingType": { "type": "string", "enum": ["hotel", "hostel"] },
+                  "name": { "type": "string" },
+                  "location": { "type": "string" },
+                  "pricePerNight": { "type": "number", "minimum": 0 },
+                  "availableUnits": { "type": "integer", "minimum": 0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/partners/accommodations/{listingId}/apply": {
+      "post": {
+        "tags": ["Partners"],
+        "summary": "Apply for accommodation",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "listingId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["checkInDate", "checkOutDate"],
+                "properties": {
+                  "checkInDate": { "type": "string", "example": "2026-04-20T12:00:00Z" },
+                  "checkOutDate": { "type": "string", "example": "2026-04-25T10:00:00Z" },
+                  "occupants": { "type": "integer", "minimum": 1 },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Application created" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/partners/accommodation-applications/{id}/status": {
+      "patch": {
+        "tags": ["Partners"],
+        "summary": "Update accommodation application status",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["pending", "approved", "rejected", "cancelled"] },
+                  "reviewNotes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/partners/cab-bookings/{id}/status": {
+      "patch": {
+        "tags": ["Partners"],
+        "summary": "Update cab booking status",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["accepted", "ongoing", "completed", "cancelled", "rejected"] },
+                  "finalFare": { "type": "number", "minimum": 0 }
+                }
+              },
+              "example": { "status": "completed", "finalFare": 700 }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
     "/api/past-papers/upload/base64": {
-      "post": { "tags": ["Past Papers"], "summary": "Upload past paper", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Uploaded" } } }
+      "post": {
+        "tags": ["Past Papers"],
+        "summary": "Upload past paper",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "institution", "course", "subject", "year", "originalFileName", "contentBase64"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "institution": { "type": "string" },
+                  "course": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "year": { "type": "integer", "minimum": 1990, "maximum": 2100 },
+                  "originalFileName": { "type": "string" },
+                  "mimeType": { "type": "string" },
+                  "contentBase64": { "type": "string" }
+                }
+              },
+              "example": {
+                "title": "Algorithms CAT 2025",
+                "institution": "TVET College",
+                "course": "Computer Science",
+                "subject": "Algorithms",
+                "year": 2025,
+                "originalFileName": "algorithms-cat-2025.pdf",
+                "mimeType": "application/pdf",
+                "contentBase64": "JVBERi0xLjc..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Uploaded" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/past-papers/{id}/download": {
+      "post": {
+        "tags": ["Past Papers"],
+        "summary": "Generate signed download URL",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Signed URL generated" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/past-papers/{id}/verify": {
+      "patch": {
+        "tags": ["Past Papers"],
+        "summary": "Verify past paper (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Verified" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/marketplace/{id}": {
+      "patch": {
+        "tags": ["Marketplace"],
+        "summary": "Update own listing",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "category": { "type": "string" },
+                  "condition": { "type": "string" },
+                  "price": { "type": "number", "minimum": 0 },
+                  "currency": { "type": "string", "enum": ["KES", "USD", "EUR", "GBP"] },
+                  "imageUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+                  "status": { "type": "string", "enum": ["active", "reserved", "sold", "inactive"] },
+                  "quantity": { "type": "integer", "minimum": 1 },
+                  "tags": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "example": { "price": 1800, "status": "active" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
     },
     "/api/partners/settlements/my": {
       "get": { "tags": ["Partners"], "summary": "Partner settlements", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Settlement items" } } }

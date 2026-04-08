@@ -12,6 +12,7 @@
 - Business module (plans/subscriptions, entitlement gating middleware, disputes, finance summary endpoint).
 - API docs refresh and architecture/phase docs updates.
 - Full validation coverage on legacy mutation routes (auth/user/ai/books/courses/products/rides/hostels/past-papers/partners/live-classroom/queue/compliance sweep).
+- OpenAPI request/response examples added for newly validated legacy mutation endpoints and standardized error components.
 
 ## In Progress
 - Credential onboarding for MFA delivery providers (SMTP/Twilio adapters are implemented).
@@ -26,4 +27,4 @@
 ## Next Exact Step
 1. Provision Redis in CI/staging and enable full queue+realtime integration tests.
 2. Choose OTP/email provider and wire MFA + notification dispatch to real channels.
-3. Add OpenAPI request/response examples for newly validated legacy routes and standardized error envelopes.
+3. Add staging smoke tests for partner booking and settlement flows with idempotency key replay checks.
