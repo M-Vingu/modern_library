@@ -12,13 +12,14 @@ const {
 } = require('../controllers/marketplaceController');
 const { validateRequest } = require('../middleware/validateRequest');
 const { createListingSchema } = require('../validations/marketplaceSchemas');
+const { marketplaceUpdateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
 const { idempotencyMiddleware } = require('../middleware/idempotency');
 
 router.get('/', listListings);
 router.get('/my/listings', protect, listMyListings);
 router.get('/:id', getListingById);
 router.post('/', protect, validateRequest(createListingSchema), createListing);
-router.patch('/:id', protect, updateMyListing);
-router.post('/:id/buy', protect, idempotencyMiddleware(), buyListing);
+router.patch('/:id', protect, validateRequest(marketplaceUpdateSchema), updateMyListing);
+router.post('/:id/buy', protect, validateRequest(idParamOnlySchema), idempotencyMiddleware(), buyListing);
 
 module.exports = router;

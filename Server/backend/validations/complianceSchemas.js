@@ -49,10 +49,17 @@ const dsarListSchema = z.object({
   }).passthrough(),
 });
 
+const retentionSweepSchema = z.object({
+  body: z.object({}).passthrough(),
+  params: z.object({}).passthrough(),
+  query: z.object({}).passthrough(),
+});
+
 module.exports = {
   consentSchema,
   dsarSchema,
   dsarStatusSchema,
   retentionPolicySchema,
   dsarListSchema,
+  retentionSweepSchema,
 };

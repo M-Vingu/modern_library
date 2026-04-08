@@ -6,7 +6,9 @@ const Course = require('../models/Course');
 const User = require('../models/user');
 const Wallet = require('../models/wallet');
 const protect = require('../middleware/authMiddleware');
+const { validateRequest } = require('../middleware/validateRequest');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
+const { courseCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
 
 // GET all courses
 router.get('/', async (req, res) => {
@@ -19,7 +21,7 @@ router.get('/', async (req, res) => {
 });
 
 // CREATE course
-router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
+router.post('/', protect, authorizeRoles('admin'), validateRequest(courseCreateSchema), async (req, res) => {
   try {
     const course = new Course(req.body);
     await course.save();
@@ -30,7 +32,7 @@ router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
 });
 
 // ENROLL in a course (atomic user + wallet update)
-router.post('/:id/enroll', protect, async (req, res) => {
+router.post('/:id/enroll', protect, validateRequest(idParamOnlySchema), async (req, res) => {
   const session = await mongoose.startSession();
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -113,7 +115,7 @@ router.post('/:id/enroll', protect, async (req, res) => {
 });
 
 // DELETE course
-router.delete('/:id', protect, authorizeRoles('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeRoles('admin'), validateRequest(idParamOnlySchema), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid course id' });

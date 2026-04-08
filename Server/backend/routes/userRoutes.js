@@ -6,6 +6,8 @@ const { register, login } = require('../controllers/userController');
 const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const { createRateLimiter } = require('../middleware/rateLimiter');
+const { validateRequest } = require('../middleware/validateRequest');
+const { userRegisterSchema, userLoginSchema } = require('../validations/legacySchemas');
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -14,10 +16,10 @@ const authLimiter = createRateLimiter({
 });
 
 // REGISTER
-router.post('/register', authLimiter, register);
+router.post('/register', authLimiter, validateRequest(userRegisterSchema), register);
 
 // LOGIN
-router.post('/login', authLimiter, login);
+router.post('/login', authLimiter, validateRequest(userLoginSchema), login);
 
 // GET ALL USERS (TEST)
 router.get('/', protect, authorizeRoles('admin'), async (req, res) => {

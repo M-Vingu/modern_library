@@ -5,7 +5,9 @@ const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Wallet = require('../models/wallet');
 const protect = require('../middleware/authMiddleware');
+const { validateRequest } = require('../middleware/validateRequest');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
+const { productCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
 
 // GET all products
 router.get('/', async (req, res) => {
@@ -18,7 +20,7 @@ router.get('/', async (req, res) => {
 });
 
 // CREATE product (admin only)
-router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
+router.post('/', protect, authorizeRoles('admin'), validateRequest(productCreateSchema), async (req, res) => {
   try {
     const product = new Product(req.body);
     await product.save();
@@ -29,7 +31,7 @@ router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
 });
 
 // BUY product (atomic wallet debit + transaction entry)
-router.post('/:id/buy', protect, async (req, res) => {
+router.post('/:id/buy', protect, validateRequest(idParamOnlySchema), async (req, res) => {
   const session = await mongoose.startSession();
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -87,7 +89,7 @@ router.post('/:id/buy', protect, async (req, res) => {
 });
 
 // DELETE product
-router.delete('/:id', protect, authorizeRoles('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeRoles('admin'), validateRequest(idParamOnlySchema), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid product id' });

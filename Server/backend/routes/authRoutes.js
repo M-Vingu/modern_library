@@ -22,6 +22,7 @@ const {
   mfaVerifySchema,
   sessionRevokeSchema,
 } = require('../validations/authSchemas');
+const { logoutSchema, revokeAllSchema } = require('../validations/legacySchemas');
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -298,7 +299,7 @@ router.post('/refresh', authLimiter, validateRequest(refreshSchema), async (req,
   }
 });
 
-router.post('/logout', protect, async (req, res) => {
+router.post('/logout', protect, validateRequest(logoutSchema), async (req, res) => {
   try {
     const { refreshToken } = req.body || {};
     if (refreshToken) {
@@ -346,7 +347,7 @@ router.post('/sessions/revoke', protect, validateRequest(sessionRevokeSchema), a
   return res.json({ success: true, message: 'Session revoked', sessionId });
 });
 
-router.post('/sessions/revoke-all', protect, async (req, res) => {
+router.post('/sessions/revoke-all', protect, validateRequest(revokeAllSchema), async (req, res) => {
   await RefreshToken.updateMany({ userId: req.user.id, revokedAt: null }, { revokedAt: new Date() });
   await User.findByIdAndUpdate(req.user.id, { $inc: { tokenVersion: 1 } });
   await invalidateAccessTokenFromRequest(req, 'revoke_all');

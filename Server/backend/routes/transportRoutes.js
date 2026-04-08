@@ -3,6 +3,8 @@ const router = express.Router();
 
 const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
+const { validateRequest } = require('../middleware/validateRequest');
+const { rideCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
 const {
   getRides,
   createRide,
@@ -14,12 +16,12 @@ const {
 router.get('/', getRides);
 
 // CREATE transport ride
-router.post('/', protect, authorizeRoles('admin'), createRide);
+router.post('/', protect, authorizeRoles('admin'), validateRequest(rideCreateSchema), createRide);
 
 // BOOK a seat on transport ride (wallet payment)
-router.post('/:id/book', protect, bookRide);
+router.post('/:id/book', protect, validateRequest(idParamOnlySchema), bookRide);
 
 // DELETE transport ride
-router.delete('/:id', protect, authorizeRoles('admin'), deleteRide);
+router.delete('/:id', protect, authorizeRoles('admin'), validateRequest(idParamOnlySchema), deleteRide);
 
 module.exports = router;

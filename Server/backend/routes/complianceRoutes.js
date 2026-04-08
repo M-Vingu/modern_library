@@ -10,6 +10,7 @@ const {
   dsarStatusSchema,
   retentionPolicySchema,
   dsarListSchema,
+  retentionSweepSchema,
 } = require('../validations/complianceSchemas');
 const {
   recordConsent,
@@ -28,7 +29,7 @@ router.post('/dsar/export', protect, validateRequest(dsarSchema), requestDsarExp
 router.post('/dsar/delete', protect, validateRequest(dsarSchema), requestDsarDelete);
 router.get('/dsar/:id', protect, getDsarRequest);
 router.patch('/dsar/:id/status', protect, authorizeRoles('admin'), validateRequest(dsarStatusSchema), updateDsarStatus);
-router.post('/retention/sweep', protect, authorizeRoles('admin'), triggerRetentionSweep);
+router.post('/retention/sweep', protect, authorizeRoles('admin'), validateRequest(retentionSweepSchema), triggerRetentionSweep);
 router.put('/retention/policies', protect, authorizeRoles('admin'), validateRequest(retentionPolicySchema), upsertRetentionPolicy);
 router.get('/retention/policies', protect, authorizeRoles('admin'), listRetentionPolicies);
 router.get('/dsar', protect, authorizeRoles('admin'), validateRequest(dsarListSchema), listDsarRequests);
