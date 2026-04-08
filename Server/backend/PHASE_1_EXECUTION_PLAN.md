@@ -272,3 +272,11 @@ Done when:
 1. Implement `/api/kids/*` models + routes + parent guard middleware.
 2. Build `assessment` module (submission -> AI grade draft -> teacher finalize).
 3. Add queue processors for real notification delivery and settlement payout execution.
+
+## Progress Snapshot (Implemented)
+- Kids Universe backend MVP delivered with kid-safe filtering and parent controls.
+- Assessment + AI grading backend delivered with teacher override audit.
+- Compliance core delivered (consent + DSAR request/status + retention sweep trigger scaffold).
+- Entitlement/subscription + dispute + finance summary modules delivered.
+- Realtime moderation controls delivered (lock/mute/remove) with anti-spam signaling limits.
+- Queue replay + metrics endpoints delivered for operational recovery.

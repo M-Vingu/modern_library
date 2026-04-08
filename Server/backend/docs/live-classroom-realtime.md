@@ -26,6 +26,7 @@
 - Client to server:
   - `classroom:join-session` payload `{ sessionId }`
   - `classroom:leave-session` payload `{ sessionId }`
+  - `classroom:moderation` payload `{ action, sessionId, targetUserId? }`
   - `webrtc:offer` payload `{ sessionId, targetUserId, signal }`
   - `webrtc:answer` payload `{ sessionId, targetUserId, signal }`
   - `webrtc:ice-candidate` payload `{ sessionId, targetUserId, signal }`
@@ -49,3 +50,11 @@ Each client event supports Socket.IO ACK with:
   - `SIGNAL_RATE_LIMIT_WINDOW_SEC`
   - `SIGNAL_RATE_LIMIT_PER_SOCKET`
   - `SIGNAL_RATE_LIMIT_PER_ROOM`
+
+## Moderator Controls
+- Supported actions (via `classroom:moderation`):
+  - `lock_room`, `unlock_room`
+  - `mute_user`, `unmute_user`
+  - `remove_user`
+- Room lock blocks new joins except host/admin/moderator.
+- Muted users cannot publish WebRTC signaling events.

@@ -2,28 +2,26 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Modern Library API",
-    "version": "1.0.0",
-    "description": "API documentation for learning, marketplace, AI, partner, and live classroom modules."
+    "version": "1.1.0",
+    "description": "API docs for Modern Library mega-platform modules (learning, kids, realtime, commerce, compliance, security)."
   },
-  "servers": [
-    { "url": "http://localhost:5000" }
-  ],
+  "servers": [{ "url": "http://localhost:5000" }],
   "tags": [
     { "name": "System" },
     { "name": "Auth" },
-    { "name": "Past Papers" },
-    { "name": "Marketplace" },
-    { "name": "AI" },
+    { "name": "Kids" },
+    { "name": "Assessment" },
+    { "name": "Compliance" },
+    { "name": "Business" },
+    { "name": "Queues" },
+    { "name": "Live Classroom" },
     { "name": "Partners" },
-    { "name": "Live Classroom" }
+    { "name": "Marketplace" },
+    { "name": "Past Papers" }
   ],
   "components": {
     "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      }
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
     },
     "schemas": {
       "ErrorResponse": {
@@ -38,307 +36,196 @@
               "details": { "type": "object" }
             }
           },
-          "requestId": { "type": "string", "example": "a8e29a68-cfca-41e2-97ac-906f7b5131f5" }
+          "requestId": { "type": "string", "example": "4a35060e-dc7a-4a27-a9df-1db6a419f7db" }
+        }
+      },
+      "SuccessEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true }
         }
       }
     }
   },
   "paths": {
     "/api/system/health": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Liveness probe",
-        "responses": { "200": { "description": "Service is alive" } }
-      }
+      "get": { "tags": ["System"], "summary": "Liveness probe", "responses": { "200": { "description": "Alive" } } }
     },
     "/api/system/ready": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Readiness probe (DB + dependencies)",
-        "responses": { "200": { "description": "Ready" }, "503": { "description": "Not ready" } }
+      "get": { "tags": ["System"], "summary": "Readiness probe", "responses": { "200": { "description": "Ready" }, "503": { "description": "Not ready" } } }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" },
+                  "role": { "type": "string", "example": "student" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Registered" } }
       }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login user",
+        "responses": {
+          "200": { "description": "Access + refresh token" },
+          "202": { "description": "MFA required" }
+        }
+      }
+    },
+    "/api/auth/mfa/challenge": {
+      "post": { "tags": ["Auth"], "summary": "Create MFA challenge (scaffold)", "responses": { "202": { "description": "Challenge created" } } }
+    },
+    "/api/auth/mfa/verify": {
+      "post": { "tags": ["Auth"], "summary": "Verify MFA challenge", "responses": { "200": { "description": "MFA verified" } } }
     },
     "/api/auth/refresh": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Rotate refresh token and issue new access token",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["refreshToken"],
-                "properties": {
-                  "refreshToken": { "type": "string" }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "New access and refresh token issued" },
-          "401": { "description": "Refresh token invalid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
-        }
-      }
+      "post": { "tags": ["Auth"], "summary": "Rotate refresh token", "responses": { "200": { "description": "Token rotated" }, "401": { "description": "Invalid token" } } }
     },
-    "/api/auth/logout": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Logout and revoke tokens",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "Logged out" } }
-      }
+    "/api/auth/sessions": {
+      "get": { "tags": ["Auth"], "summary": "List active sessions", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Sessions" } } }
     },
-    "/api/past-papers": {
+    "/api/auth/sessions/revoke": {
+      "post": { "tags": ["Auth"], "summary": "Revoke a session", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Revoked" } } }
+    },
+    "/api/auth/sessions/revoke-all": {
+      "post": { "tags": ["Auth"], "summary": "Revoke all sessions", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Revoked all" } } }
+    },
+
+    "/api/kids/profiles": {
+      "post": { "tags": ["Kids"], "summary": "Create kid profile", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Created" } } },
+      "get": { "tags": ["Kids"], "summary": "List parent kid profiles", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Profiles" } } }
+    },
+    "/api/kids/content": {
+      "get": { "tags": ["Kids"], "summary": "List kid-safe content for kidId", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Content list" }, "403": { "description": "Forbidden" } } }
+    },
+    "/api/kids/progress": {
+      "post": { "tags": ["Kids"], "summary": "Upsert kid progress", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Progress recorded" } } }
+    },
+    "/api/kids/rewards/{kidId}": {
       "get": {
-        "tags": ["Past Papers"],
-        "summary": "List/search public past papers",
-        "parameters": [
-          { "name": "q", "in": "query", "schema": { "type": "string" } },
-          { "name": "institution", "in": "query", "schema": { "type": "string" } },
-          { "name": "course", "in": "query", "schema": { "type": "string" } },
-          { "name": "subject", "in": "query", "schema": { "type": "string" } },
-          { "name": "year", "in": "query", "schema": { "type": "integer" } }
-        ],
-        "responses": {
-          "200": { "description": "Paginated list of past papers" }
-        }
-      },
-      "post": {
-        "tags": ["Past Papers"],
-        "summary": "Create past paper record with external file URL",
+        "tags": ["Kids"],
+        "summary": "Get kid rewards",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["title", "institution", "course", "subject", "year", "fileUrl"],
-                "properties": {
-                  "title": { "type": "string" },
-                  "institution": { "type": "string" },
-                  "course": { "type": "string" },
-                  "subject": { "type": "string" },
-                  "year": { "type": "integer" },
-                  "fileUrl": { "type": "string" }
-                }
-              }
-            }
-          }
-        },
-        "responses": { "201": { "description": "Created" } }
+        "parameters": [{ "name": "kidId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Rewards" } }
       }
+    },
+    "/api/kids/parent-controls/{kidId}": {
+      "put": {
+        "tags": ["Kids"],
+        "summary": "Update parent controls",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "kidId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/api/kids/safety-events": {
+      "get": { "tags": ["Kids"], "summary": "List kid safety events", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Events" } } }
+    },
+
+    "/api/assessment/assignments": {
+      "post": { "tags": ["Assessment"], "summary": "Create assignment", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Created" } } }
+    },
+    "/api/assessment/submissions": {
+      "post": { "tags": ["Assessment"], "summary": "Submit assignment", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Submitted" } } }
+    },
+    "/api/assessment/submissions/{id}/ai-grade": {
+      "post": { "tags": ["Assessment"], "summary": "Draft AI grade", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Drafted" } } }
+    },
+    "/api/assessment/submissions/{id}/finalize": {
+      "patch": { "tags": ["Assessment"], "summary": "Finalize grade", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Finalized" }, "403": { "description": "Teacher/admin only" } } }
+    },
+    "/api/assessment/submissions/{id}": {
+      "get": { "tags": ["Assessment"], "summary": "Get submission details", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Submission details" } } }
+    },
+
+    "/api/compliance/consent": {
+      "post": { "tags": ["Compliance"], "summary": "Record consent version", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Recorded" } } }
+    },
+    "/api/compliance/dsar/export": {
+      "post": { "tags": ["Compliance"], "summary": "Request DSAR export", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Requested" } } }
+    },
+    "/api/compliance/dsar/delete": {
+      "post": { "tags": ["Compliance"], "summary": "Request DSAR deletion", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Requested" } } }
+    },
+    "/api/compliance/dsar/{id}": {
+      "get": { "tags": ["Compliance"], "summary": "Get DSAR request", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "DSAR" } } }
+    },
+    "/api/compliance/dsar/{id}/status": {
+      "patch": { "tags": ["Compliance"], "summary": "Update DSAR status (admin)", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Updated" } } }
+    },
+    "/api/compliance/retention/sweep": {
+      "post": { "tags": ["Compliance"], "summary": "Trigger retention sweep", "security": [{ "bearerAuth": [] }], "responses": { "202": { "description": "Queued" } } }
+    },
+
+    "/api/business/plans": {
+      "post": { "tags": ["Business"], "summary": "Create subscription plan", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Created" } } }
+    },
+    "/api/business/subscriptions": {
+      "post": { "tags": ["Business"], "summary": "Subscribe current user", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Subscribed" } } }
+    },
+    "/api/business/subscriptions/my": {
+      "get": { "tags": ["Business"], "summary": "List my subscriptions", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Subscription list" } } }
+    },
+    "/api/business/marketplace/disputes/{listingId}/open": {
+      "post": { "tags": ["Business"], "summary": "Open marketplace dispute", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Dispute opened" } } }
+    },
+    "/api/business/marketplace/disputes/{id}/respond": {
+      "post": { "tags": ["Business"], "summary": "Respond to dispute", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Responded" } } }
+    },
+    "/api/business/marketplace/disputes/{id}/resolve": {
+      "post": { "tags": ["Business"], "summary": "Resolve dispute (admin)", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Resolved" } } }
+    },
+    "/api/business/finance/summary": {
+      "get": { "tags": ["Business"], "summary": "Finance summary (entitled)", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Summary" }, "402": { "description": "Entitlement required" } } }
+    },
+
+    "/api/queues/{name}/metrics": {
+      "get": {
+        "tags": ["Queues"],
+        "summary": "Queue metrics",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Metrics" } }
+      }
+    },
+    "/api/queues/{name}/dead-letter/replay": {
+      "post": {
+        "tags": ["Queues"],
+        "summary": "Replay dead-letter job",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Replayed" } }
+      }
+    },
+
+    "/api/live-classrooms/realtime/config": {
+      "get": { "tags": ["Live Classroom"], "summary": "Socket/WebRTC config", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Config" } } }
     },
     "/api/past-papers/upload/base64": {
-      "post": {
-        "tags": ["Past Papers"],
-        "summary": "Upload past paper content as base64",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "title",
-                  "institution",
-                  "course",
-                  "subject",
-                  "year",
-                  "originalFileName",
-                  "contentBase64"
-                ],
-                "properties": {
-                  "title": { "type": "string" },
-                  "institution": { "type": "string" },
-                  "course": { "type": "string" },
-                  "subject": { "type": "string" },
-                  "year": { "type": "integer" },
-                  "originalFileName": { "type": "string" },
-                  "mimeType": { "type": "string" },
-                  "contentBase64": { "type": "string" }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": { "description": "Uploaded with signed download URL" }
-        }
-      }
-    },
-    "/api/past-papers/{id}/download": {
-      "post": {
-        "tags": ["Past Papers"],
-        "summary": "Generate signed download URL",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": { "description": "Signed URL generated" }
-        }
-      }
-    },
-    "/api/files/past-papers/download": {
-      "get": {
-        "tags": ["Past Papers"],
-        "summary": "Resolve signed token and stream/redirect file",
-        "parameters": [
-          { "name": "token", "in": "query", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "File stream or redirect" } }
-      }
-    },
-    "/api/marketplace": {
-      "get": {
-        "tags": ["Marketplace"],
-        "summary": "List marketplace listings",
-        "responses": { "200": { "description": "Listings" } }
-      },
-      "post": {
-        "tags": ["Marketplace"],
-        "summary": "Create marketplace listing",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "201": { "description": "Created" } }
-      }
-    },
-    "/api/marketplace/{id}/buy": {
-      "post": {
-        "tags": ["Marketplace"],
-        "summary": "Buy a listing",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "Purchase successful" } }
-      }
-    },
-    "/api/ai/health": {
-      "get": {
-        "tags": ["AI"],
-        "summary": "AI service health",
-        "responses": { "200": { "description": "Provider status" } }
-      }
-    },
-    "/api/ai/chat": {
-      "post": {
-        "tags": ["AI"],
-        "summary": "Chat with AI tutor scaffold",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "AI response" } }
-      }
-    },
-    "/api/partners/onboard": {
-      "post": {
-        "tags": ["Partners"],
-        "summary": "Partner onboarding request",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "201": { "description": "Partner request created" } }
-      }
-    },
-    "/api/partners/cab-bookings": {
-      "post": {
-        "tags": ["Partners"],
-        "summary": "Create cab booking",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "201": { "description": "Cab booking created" } }
-      }
-    },
-    "/api/partners/accommodations/{listingId}/apply": {
-      "post": {
-        "tags": ["Partners"],
-        "summary": "Apply for accommodation",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "listingId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "201": { "description": "Application submitted" } }
-      }
+      "post": { "tags": ["Past Papers"], "summary": "Upload past paper", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Uploaded" } } }
     },
     "/api/partners/settlements/my": {
-      "get": {
-        "tags": ["Partners"],
-        "summary": "Partner settlement ledger view",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "Settlement entries" } }
-      }
+      "get": { "tags": ["Partners"], "summary": "Partner settlements", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Settlement items" } } }
     },
-    "/api/live-classrooms": {
-      "get": {
-        "tags": ["Live Classroom"],
-        "summary": "List live classrooms",
-        "responses": { "200": { "description": "Classrooms list" } }
-      },
-      "post": {
-        "tags": ["Live Classroom"],
-        "summary": "Create classroom",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "201": { "description": "Classroom created" } }
-      }
-    },
-    "/api/live-classrooms/realtime/config": {
-      "get": {
-        "tags": ["Live Classroom"],
-        "summary": "Get Socket.IO + WebRTC client config",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "Realtime signaling config" } }
-      }
-    },
-    "/api/live-classrooms/{classroomId}/sessions": {
-      "post": {
-        "tags": ["Live Classroom"],
-        "summary": "Create a scheduled live session",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "classroomId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "201": { "description": "Session created" } }
-      },
-      "get": {
-        "tags": ["Live Classroom"],
-        "summary": "List classroom sessions",
-        "parameters": [
-          { "name": "classroomId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "Session list" } }
-      }
-    },
-    "/api/live-classrooms/sessions/{sessionId}/join": {
-      "post": {
-        "tags": ["Live Classroom"],
-        "summary": "Join a live session",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "Join token and room URL" } }
-      }
-    },
-    "/api/live-classrooms/sessions/{sessionId}/leave": {
-      "post": {
-        "tags": ["Live Classroom"],
-        "summary": "Leave a live session",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "Leave response with duration" } }
-      }
-    },
-    "/api/live-classrooms/sessions/{sessionId}/attendance": {
-      "get": {
-        "tags": ["Live Classroom"],
-        "summary": "Get session attendance",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "Attendance list" } }
-      }
+    "/api/marketplace/{id}/buy": {
+      "post": { "tags": ["Marketplace"], "summary": "Buy listing", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Purchased" } } }
     }
   }
 }

@@ -19,6 +19,8 @@ This backend is organized as modular domain services under one API:
 - AI tutor scaffold
 - Live classroom sessions and attendance tracking
 - Realtime classroom transport (Socket.IO + WebRTC signaling relay)
+- Assessment + AI grading workflow (draft + teacher finalization)
+- Kids Universe module (kid-safe content, progress, rewards, parent controls)
 
 3. Student Commerce:
 - Campus marketplace (peer-to-peer)
@@ -35,6 +37,7 @@ This backend is organized as modular domain services under one API:
 - Transaction history endpoints
 - Partner settlement ledger (gross, commission, payout)
 - Audit log events for critical operations (auth, partner approvals, payouts)
+- Finance summary and dispute lifecycle reporting endpoints
 
 6. API Documentation:
 - OpenAPI 3.0 specification
@@ -44,6 +47,7 @@ This backend is organized as modular domain services under one API:
 - Structured logging (`pino` + request IDs)
 - Health/readiness probes (`/api/system/health`, `/api/system/ready`)
 - Redis-backed queue scaffolding (BullMQ) with dead-letter queues
+- Queue replay + metrics admin endpoints
 
 ## 2. Deployment Topology (Current)
 
@@ -106,6 +110,18 @@ This backend is organized as modular domain services under one API:
 7. `accommodationapplications` (`AccommodationApplication`)
 - student stay applications
 - check-in/out dates, status and review notes
+
+8. `kidprofiles`, `kidcontents`, `kidprogresses`, `kidrewards`, `parentcontrols`, `kidsafetyevents`
+- Kids Universe account-safe learning data model
+
+9. `assignments`, `assignmentsubmissions`, `aigradedrafts`, `finalgradeaudits`
+- Assessment + AI grading and teacher override audit trail
+
+10. `consentrecords`, `dsarrequests`, `retentionpolicies`
+- Compliance, consent versioning, DSAR tracking, and retention scaffolds
+
+11. `subscriptionplans`, `usersubscriptions`, `marketplacedisputes`, `userreputations`
+- Business entitlement, disputes, and reputation primitives
 
 ## 4. API Module Map
 
