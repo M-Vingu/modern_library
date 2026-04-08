@@ -37,4 +37,22 @@ const retentionPolicySchema = z.object({
   query: z.object({}).passthrough(),
 });
 
-module.exports = { consentSchema, dsarSchema, dsarStatusSchema, retentionPolicySchema };
+const dsarListSchema = z.object({
+  body: z.object({}).passthrough(),
+  params: z.object({}).passthrough(),
+  query: z.object({
+    status: z.enum(['requested', 'in_progress', 'completed', 'rejected']).optional(),
+    requestType: z.enum(['export', 'delete']).optional(),
+    userId: z.string().min(8).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  }).passthrough(),
+});
+
+module.exports = {
+  consentSchema,
+  dsarSchema,
+  dsarStatusSchema,
+  retentionPolicySchema,
+  dsarListSchema,
+};

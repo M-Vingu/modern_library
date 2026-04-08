@@ -164,6 +164,21 @@
     "/api/compliance/dsar/delete": {
       "post": { "tags": ["Compliance"], "summary": "Request DSAR deletion", "security": [{ "bearerAuth": [] }], "responses": { "201": { "description": "Requested" } } }
     },
+    "/api/compliance/dsar": {
+      "get": {
+        "tags": ["Compliance"],
+        "summary": "List DSAR requests (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["requested", "in_progress", "completed", "rejected"] } },
+          { "name": "requestType", "in": "query", "schema": { "type": "string", "enum": ["export", "delete"] } },
+          { "name": "userId", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } }
+        ],
+        "responses": { "200": { "description": "Paginated DSAR requests list" } }
+      }
+    },
     "/api/compliance/dsar/{id}": {
       "get": { "tags": ["Compliance"], "summary": "Get DSAR request", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "DSAR" } } }
     },

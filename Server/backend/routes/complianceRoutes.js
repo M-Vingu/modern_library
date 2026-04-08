@@ -9,11 +9,13 @@ const {
   dsarSchema,
   dsarStatusSchema,
   retentionPolicySchema,
+  dsarListSchema,
 } = require('../validations/complianceSchemas');
 const {
   recordConsent,
   requestDsarExport,
   requestDsarDelete,
+  listDsarRequests,
   getDsarRequest,
   updateDsarStatus,
   triggerRetentionSweep,
@@ -29,6 +31,6 @@ router.patch('/dsar/:id/status', protect, authorizeRoles('admin'), validateReque
 router.post('/retention/sweep', protect, authorizeRoles('admin'), triggerRetentionSweep);
 router.put('/retention/policies', protect, authorizeRoles('admin'), validateRequest(retentionPolicySchema), upsertRetentionPolicy);
 router.get('/retention/policies', protect, authorizeRoles('admin'), listRetentionPolicies);
-router.get('/dsar', protect, authorizeRoles('admin'), async (_req, res) => res.fail(501, 'COMPLIANCE_DSAR_LIST_NOT_IMPLEMENTED', 'DSAR listing endpoint is scaffolded and not yet implemented'));
+router.get('/dsar', protect, authorizeRoles('admin'), validateRequest(dsarListSchema), listDsarRequests);
 
 module.exports = router;

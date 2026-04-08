@@ -6,6 +6,6 @@ const retentionPolicySchema = new mongoose.Schema({
   mode: { type: String, enum: ['soft_delete', 'hard_delete', 'archive'], default: 'soft_delete' },
   active: { type: Boolean, default: true },
   notes: { type: String },
-}, { timestamps: true });
+}, { timestamps: true, suppressReservedKeysWarning: true });
 
 module.exports = mongoose.model('RetentionPolicy', retentionPolicySchema);

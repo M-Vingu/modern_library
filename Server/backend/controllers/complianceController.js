@@ -69,6 +69,41 @@ async function getDsarRequest(req, res) {
   return res.json({ success: true, item });
 }
 
+async function listDsarRequests(req, res) {
+  if (req.user.role !== 'admin') return fail(res, 403, 'COMPLIANCE_FORBIDDEN', 'Admin only');
+
+  const {
+    status,
+    requestType,
+    userId,
+    page = 1,
+    limit = 20,
+  } = req.query;
+
+  const filter = {};
+  if (status) filter.status = status;
+  if (requestType) filter.requestType = requestType;
+  if (userId) filter.userId = userId;
+
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safePage = Math.max(Number(page) || 1, 1);
+
+  const items = await DSARRequest.find(filter)
+    .sort({ requestedAt: -1, createdAt: -1 })
+    .skip((safePage - 1) * safeLimit)
+    .limit(safeLimit)
+    .populate('userId', 'name email role');
+  const total = await DSARRequest.countDocuments(filter);
+
+  return res.json({
+    success: true,
+    page: safePage,
+    limit: safeLimit,
+    total,
+    items,
+  });
+}
+
 async function updateDsarStatus(req, res) {
   if (req.user.role !== 'admin') return fail(res, 403, 'COMPLIANCE_FORBIDDEN', 'Admin only');
   const item = await DSARRequest.findById(req.params.id);
@@ -121,6 +156,7 @@ module.exports = {
   recordConsent,
   requestDsarExport,
   requestDsarDelete,
+  listDsarRequests,
   getDsarRequest,
   updateDsarStatus,
   triggerRetentionSweep,

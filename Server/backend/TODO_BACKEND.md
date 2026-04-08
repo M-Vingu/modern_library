@@ -8,6 +8,7 @@
 - Kids Universe MVP backend (models, routes, access controls, age/topic safety filtering).
 - Assessment + AI grading module (submission, AI draft, teacher finalization with audit).
 - Compliance module (consent records, DSAR requests/status updates, retention sweep trigger scaffold).
+- Compliance DSAR admin listing endpoint with filters/pagination.
 - Business module (plans/subscriptions, entitlement gating middleware, disputes, finance summary endpoint).
 - API docs refresh and architecture/phase docs updates.
 
@@ -21,8 +22,6 @@
   Blocker: provider credentials and vendor selection not finalized.
 - Production Redis-backed queue/realtime smoke tests in CI.
   Blocker: CI environment Redis service not provisioned yet.
-- DSAR list endpoint implementation.
-  Blocker: pagination/search policy decisions pending.
 
 ## Next Exact Step
 1. Provision Redis in CI/staging and enable full queue+realtime integration tests.
