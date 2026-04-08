@@ -5,6 +5,7 @@ const SettlementLedger = require('../models/SettlementLedger');
 const PastPaper = require('../models/PastPaper');
 const DSARRequest = require('../models/DSARRequest');
 const RetentionPolicy = require('../models/RetentionPolicy');
+const { sendNotification } = require('../services/notificationProviderService');
 
 function createWorker(queueName, processor) {
   if (!hasRedisConfigured()) return null;
@@ -55,9 +56,18 @@ function startWorkers() {
 
   const notificationWorker = createWorker('notifications', async (job) => {
     const payload = job.data || {};
-    // Scaffold: durable queue pathway exists; provider integration can replace this.
-    logger.info({ payload }, 'notification_dispatch_scaffold');
-    return { processedAt: new Date().toISOString(), channel: payload.channel || 'in_app' };
+    const result = await sendNotification(payload);
+    if (!result.delivered && payload.requireDelivery) {
+      throw new Error(`notification_delivery_failed:${result.reason || 'unknown'}`);
+    }
+    return {
+      processedAt: new Date().toISOString(),
+      channel: payload.channel || 'in_app',
+      provider: result.provider,
+      delivered: result.delivered,
+      reason: result.reason,
+      messageId: result.messageId || null,
+    };
   });
   if (notificationWorker) workers.push(notificationWorker);
 

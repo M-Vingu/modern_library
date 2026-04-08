@@ -30,6 +30,7 @@ async function createMfaChallenge({ userId, method, contact }) {
       to: contact,
       template: 'mfa_otp',
       data: { otp, expiresInMin: 5 },
+      requireDelivery: String(process.env.MFA_ENFORCED || 'false').toLowerCase() === 'true',
     });
   }
 

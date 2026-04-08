@@ -30,6 +30,22 @@ function validateEnv() {
 
   if (String(process.env.MFA_ENFORCED || 'false').toLowerCase() === 'true') {
     requireEnv('MFA_ISSUER');
+    const method = String(process.env.MFA_DEFAULT_METHOD || 'email_otp').toLowerCase();
+    if (method === 'email_otp') {
+      const emailProvider = String(process.env.NOTIFICATION_EMAIL_PROVIDER || 'log').toLowerCase();
+      if (emailProvider === 'smtp') {
+        requireEnv('SMTP_HOST');
+        requireEnv('SMTP_FROM');
+      }
+    }
+    if (method === 'sms_otp') {
+      const smsProvider = String(process.env.NOTIFICATION_SMS_PROVIDER || 'log').toLowerCase();
+      if (smsProvider === 'twilio') {
+        requireEnv('TWILIO_ACCOUNT_SID');
+        requireEnv('TWILIO_AUTH_TOKEN');
+        requireEnv('TWILIO_FROM');
+      }
+    }
   }
 }
 

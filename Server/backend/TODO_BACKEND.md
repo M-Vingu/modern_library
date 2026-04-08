@@ -14,12 +14,12 @@
 
 ## In Progress
 - Full validation coverage on all legacy mutation routes outside newly added modules.
-- End-to-end provider wiring for MFA delivery and notification channels.
+- Credential onboarding for MFA delivery providers (SMTP/Twilio adapters are implemented).
 - Realtime Redis integration test profile in CI (env-gated skeleton added).
 
 ## Blocked
-- External provider integration for production email/SMS OTP delivery.
-  Blocker: provider credentials and vendor selection not finalized.
+- Production credentials for SMTP/Twilio in secure environment store.
+  Blocker: secrets provisioning not finalized.
 - Production Redis-backed queue/realtime smoke tests in CI.
   Blocker: CI environment Redis service not provisioned yet.
 
