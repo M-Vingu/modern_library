@@ -251,6 +251,8 @@ function getRealtimeConfig(_req, res) {
       join: 'classroom:join-session',
       leave: 'classroom:leave-session',
       presence: 'classroom:presence-updated',
+      moderationAction: 'classroom:moderation',
+      moderationUpdate: 'classroom:moderation:update',
       offer: 'webrtc:offer',
       answer: 'webrtc:answer',
       iceCandidate: 'webrtc:ice-candidate',

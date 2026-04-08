@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const MarketplaceListing = require('../models/MarketplaceListing');
 const Wallet = require('../models/wallet');
+const UserReputation = require('../models/UserReputation');
 
 function platformFeePercent() {
   const raw = Number(process.env.MARKETPLACE_FEE_PERCENT || 5);
@@ -234,6 +235,12 @@ async function buyListing(req, res) {
         err.status = 409;
         throw err;
       }
+
+      await UserReputation.findOneAndUpdate(
+        { userId: listing.sellerId },
+        { $inc: { completedSales: 1 }, $setOnInsert: { userId: listing.sellerId, sellerScore: 5 } },
+        { upsert: true, session },
+      );
     });
 
     res.json({

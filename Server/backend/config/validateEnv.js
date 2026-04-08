@@ -9,6 +9,7 @@ function requireEnv(name) {
 function validateEnv() {
   requireEnv('MONGO_URI');
   requireEnv('JWT_SECRET');
+  if (!process.env.JWT_EXPIRES_IN) requireEnv('JWT_EXPIRES_IN');
 
   const provider = (process.env.PAST_PAPER_STORAGE_PROVIDER || 'local').toLowerCase();
   if (provider === 's3') {
@@ -21,6 +22,14 @@ function validateEnv() {
     requireEnv('CLOUDINARY_CLOUD_NAME');
     requireEnv('CLOUDINARY_API_KEY');
     requireEnv('CLOUDINARY_API_SECRET');
+  }
+
+  if (String(process.env.RUN_JOB_WORKER || 'false').toLowerCase() === 'true') {
+    requireEnv('REDIS_URL');
+  }
+
+  if (String(process.env.MFA_ENFORCED || 'false').toLowerCase() === 'true') {
+    requireEnv('MFA_ISSUER');
   }
 }
 

@@ -115,6 +115,8 @@ app.use('/api/courses', require('./routes/courseRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/marketplace', require('./routes/marketplaceRoutes'));
 app.use('/api/live-classrooms', require('./routes/liveClassroomRoutes'));
+app.use('/api/kids', require('./routes/kidsRoutes'));
+app.use('/api/assessment', require('./routes/assessmentRoutes'));
 app.use('/api/rides', require('./routes/rideRoutes'));
 app.use('/api/transport', require('./routes/transportRoutes'));
 app.use('/api/hostels', require('./routes/hostelRoutes'));
@@ -124,6 +126,9 @@ app.use('/api/partners', require('./routes/partnerRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
 app.use('/api/docs', require('./routes/docsRoutes'));
 app.use('/api/system', require('./routes/systemRoutes'));
+app.use('/api/compliance', require('./routes/complianceRoutes'));
+app.use('/api/business', require('./routes/businessRoutes'));
+app.use('/api/queues', require('./routes/queueAdminRoutes'));
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 

@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
 
   role: { 
     type: String, 
-    enum: ['user', 'admin'],
+    enum: ['user', 'admin', 'teacher', 'student', 'parent', 'kid', 'partner', 'moderator'],
     default: 'user' 
   },
 
@@ -57,6 +57,11 @@ const userSchema = new mongoose.Schema({
 
   lastLogin: Date
 ,
+  tokenVersion: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
   mfaEnabled: {
     type: Boolean,
     default: false,

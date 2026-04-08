@@ -49,4 +49,22 @@ async function enqueue(queueName, jobName, payload) {
   return { queued: true, jobId: job.id };
 }
 
-module.exports = { getQueue, enqueue };
+async function replayDeadLetter(queueName, deadLetterJobId) {
+  const deadLetterQueue = getQueue(`${queueName}:dead-letter`);
+  const mainQueue = getQueue(queueName);
+  if (!deadLetterQueue || !mainQueue) return { replayed: false, reason: 'queue_not_available' };
+
+  const deadLetterJob = await deadLetterQueue.getJob(deadLetterJobId);
+  if (!deadLetterJob) return { replayed: false, reason: 'dead_letter_job_not_found' };
+  await mainQueue.add('replayed-job', deadLetterJob.data);
+  return { replayed: true, deadLetterJobId };
+}
+
+async function getQueueMetrics(queueName) {
+  const queue = getQueue(queueName);
+  if (!queue) return { available: false, reason: 'queue_not_available' };
+  const counts = await queue.getJobCounts('active', 'completed', 'failed', 'waiting', 'delayed');
+  return { available: true, queueName, counts };
+}
+
+module.exports = { getQueue, enqueue, replayDeadLetter, getQueueMetrics };

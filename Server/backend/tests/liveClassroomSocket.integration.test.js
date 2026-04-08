@@ -58,9 +58,15 @@ function createModels() {
   const session = {
     _id: SESSION_ID,
     classroomId: CLASSROOM_ID,
+    hostUserId: TEACHER_ID,
     status: 'scheduled',
     meetingRoomId: 'room-test-1',
+    roomLocked: false,
+    mutedUserIds: [],
     async save() {
+      return this;
+    },
+    lean() {
       return this;
     },
   };
@@ -68,7 +74,7 @@ function createModels() {
     _id: CLASSROOM_ID,
     createdBy: OWNER_ID,
     teacherIds: [TEACHER_ID],
-    learnerIds: [LEARNER_ID],
+    learnerIds: [LEARNER_ID, OUTSIDER_ID],
     visibility: 'private',
   };
 
@@ -185,7 +191,7 @@ test('socket join/presence/signaling works end-to-end', async () => {
   });
   const outsider = ioClient(app.url, {
     path: '/socket.io',
-    auth: { token: buildToken(OUTSIDER_ID, 'user') },
+    auth: { token: buildToken('64b64f5c9dd8a04c53f5a1a9', 'user') },
     transports: ['websocket'],
     reconnection: false,
   });
@@ -340,6 +346,104 @@ test('socket answer/ice relay symmetry and leave/disconnect attendance updates',
     const learnerRec = models.__attendance.get(learnerAttendanceKey);
     assert.ok(learnerRec.leftAt instanceof Date);
     assert.ok(learnerRec.durationSeconds >= 0);
+  } finally {
+    teacher.close();
+    learner.close();
+    await app.close();
+  }
+});
+
+test('socket moderation lock/mute/remove and rate-limit produce deterministic ack', async () => {
+  process.env.JWT_SECRET = 'test-secret-live-classroom';
+  delete process.env.JWT_ISSUER;
+  delete process.env.JWT_AUDIENCE;
+  process.env.SOCKET_IO_PATH = '/socket.io';
+  process.env.SIGNAL_RATE_LIMIT_WINDOW_SEC = '10';
+  process.env.SIGNAL_RATE_LIMIT_PER_SOCKET = '1';
+  process.env.SIGNAL_RATE_LIMIT_PER_ROOM = '100';
+
+  const models = createModels();
+  const app = await bootstrapTestServer(models);
+  const teacher = ioClient(app.url, {
+    path: '/socket.io',
+    auth: { token: buildToken(TEACHER_ID, 'teacher') },
+    transports: ['websocket'],
+    reconnection: false,
+  });
+  const learner = ioClient(app.url, {
+    path: '/socket.io',
+    auth: { token: buildToken(LEARNER_ID, 'student') },
+    transports: ['websocket'],
+    reconnection: false,
+  });
+
+  try {
+    await withTimeout(Promise.all([onceEvent(teacher, 'connect'), onceEvent(learner, 'connect')]));
+    const teacherJoin = await emitAck(teacher, 'classroom:join-session', { sessionId: SESSION_ID });
+    const learnerJoin = await emitAck(learner, 'classroom:join-session', { sessionId: SESSION_ID });
+    assert.equal(teacherJoin.ok, true);
+    assert.equal(learnerJoin.ok, true);
+
+    const lockAck = await emitAck(teacher, 'classroom:moderation', { action: 'lock_room', sessionId: SESSION_ID });
+    assert.equal(lockAck.ok, true);
+    assert.equal(lockAck.roomLocked, true);
+
+    const outsider = ioClient(app.url, {
+      path: '/socket.io',
+      auth: { token: buildToken(OUTSIDER_ID, 'student') },
+      transports: ['websocket'],
+      reconnection: false,
+    });
+    await withTimeout(onceEvent(outsider, 'connect'));
+    const outsiderJoin = await emitAck(outsider, 'classroom:join-session', { sessionId: SESSION_ID });
+    assert.equal(outsiderJoin.ok, false);
+    assert.match(outsiderJoin.message, /Room is locked/i);
+    outsider.close();
+
+    const muteAck = await emitAck(teacher, 'classroom:moderation', {
+      action: 'mute_user',
+      sessionId: SESSION_ID,
+      targetUserId: LEARNER_ID,
+    });
+    assert.equal(muteAck.ok, true);
+
+    const mutedSignal = await emitAck(learner, 'webrtc:offer', {
+      sessionId: SESSION_ID,
+      targetUserId: TEACHER_ID,
+      signal: { sdp: 'muted', type: 'offer' },
+    });
+    assert.equal(mutedSignal.ok, false);
+    assert.match(mutedSignal.message, /muted/i);
+
+    const unmuteAck = await emitAck(teacher, 'classroom:moderation', {
+      action: 'unmute_user',
+      sessionId: SESSION_ID,
+      targetUserId: LEARNER_ID,
+    });
+    assert.equal(unmuteAck.ok, true);
+
+    const first = await emitAck(learner, 'webrtc:offer', {
+      sessionId: SESSION_ID,
+      targetUserId: TEACHER_ID,
+      signal: { sdp: 'ok-1', type: 'offer' },
+    });
+    assert.equal(first.ok, true);
+
+    const second = await emitAck(learner, 'webrtc:offer', {
+      sessionId: SESSION_ID,
+      targetUserId: TEACHER_ID,
+      signal: { sdp: 'ok-2', type: 'offer' },
+    });
+    assert.equal(second.ok, false);
+    assert.match(second.message, /Rate limit exceeded/i);
+
+    const removeAck = await emitAck(teacher, 'classroom:moderation', {
+      action: 'remove_user',
+      sessionId: SESSION_ID,
+      targetUserId: LEARNER_ID,
+    });
+    assert.equal(removeAck.ok, true);
+    assert.ok(removeAck.removedCount >= 1);
   } finally {
     teacher.close();
     learner.close();

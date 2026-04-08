@@ -61,6 +61,14 @@ function canJoinClassroom(classroom, identity) {
   return false;
 }
 
+function canModerateSession(session, classroom, identity) {
+  if (identity.role === 'admin' || identity.role === 'moderator') return true;
+  if (session.hostUserId?.toString?.() === identity.userId) return true;
+  if (classroom.createdBy.toString() === identity.userId) return true;
+  if (classroom.teacherIds.some((id) => id.toString() === identity.userId)) return true;
+  return false;
+}
+
 function getSignalLimits() {
   const windowSec = Math.max(1, Number(process.env.SIGNAL_RATE_LIMIT_WINDOW_SEC || 10));
   const perSocket = Math.max(1, Number(process.env.SIGNAL_RATE_LIMIT_PER_SOCKET || 60));
@@ -200,6 +208,9 @@ async function joinLiveSessionRoom(io, socket, payload, ack) {
   if (!canJoinClassroom(classroom, identity)) {
     return safeAck(ack, { ok: false, message: 'Forbidden' });
   }
+  if (session.roomLocked && !canModerateSession(session, classroom, identity)) {
+    return safeAck(ack, { ok: false, message: 'Room is locked' });
+  }
 
   if (session.status === 'scheduled') {
     session.status = 'live';
@@ -261,6 +272,15 @@ async function relaySignal(io, socket, eventName, payload, ack) {
   if (!socket.data.sessionIds.has(sessionId)) {
     return safeAck(ack, { ok: false, message: 'Join session before signaling' });
   }
+  const sessionQuery = models.LiveSession.findById(sessionId);
+  const session = typeof sessionQuery?.lean === 'function'
+    ? await sessionQuery.lean()
+    : await sessionQuery;
+  if (!session) return safeAck(ack, { ok: false, message: 'Session not found' });
+  const muted = new Set((session.mutedUserIds || []).map((id) => id.toString()));
+  if (muted.has(socket.data.identity.userId)) {
+    return safeAck(ack, { ok: false, message: 'You are muted in this session' });
+  }
 
   const rate = await checkRateLimit(sessionId, socket.id);
   if (!rate.ok) {
@@ -285,6 +305,78 @@ async function relaySignal(io, socket, eventName, payload, ack) {
   }
 
   return safeAck(ack, { ok: true, delivered });
+}
+
+async function moderateSession(io, socket, payload, ack) {
+  const { action, sessionId, targetUserId } = payload || {};
+  if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+    return safeAck(ack, { ok: false, message: 'Valid sessionId is required' });
+  }
+  if (!['lock_room', 'unlock_room', 'mute_user', 'unmute_user', 'remove_user'].includes(action)) {
+    return safeAck(ack, { ok: false, message: 'Unsupported moderation action' });
+  }
+
+  const session = await models.LiveSession.findById(sessionId);
+  if (!session) return safeAck(ack, { ok: false, message: 'Session not found' });
+  const classroom = await models.LiveClassroom.findById(session.classroomId);
+  if (!classroom) return safeAck(ack, { ok: false, message: 'Classroom not found' });
+  const identity = socket.data.identity;
+
+  if (!canModerateSession(session, classroom, identity)) {
+    return safeAck(ack, { ok: false, message: 'Forbidden moderation action' });
+  }
+
+  const room = roomForSession(sessionId);
+  if (action === 'lock_room') {
+    session.roomLocked = true;
+    await session.save();
+    io.to(room).emit('classroom:moderation:update', { sessionId, roomLocked: true, byUserId: identity.userId });
+    return safeAck(ack, { ok: true, action, roomLocked: true });
+  }
+  if (action === 'unlock_room') {
+    session.roomLocked = false;
+    await session.save();
+    io.to(room).emit('classroom:moderation:update', { sessionId, roomLocked: false, byUserId: identity.userId });
+    return safeAck(ack, { ok: true, action, roomLocked: false });
+  }
+
+  if (!targetUserId) return safeAck(ack, { ok: false, message: 'targetUserId is required for user actions' });
+  const targetSockets = userSockets.get(String(targetUserId)) || new Set();
+
+  if (action === 'mute_user' || action === 'unmute_user') {
+    const set = new Set((session.mutedUserIds || []).map((id) => id.toString()));
+    if (action === 'mute_user') set.add(String(targetUserId));
+    if (action === 'unmute_user') set.delete(String(targetUserId));
+    session.mutedUserIds = Array.from(set);
+    await session.save();
+    io.to(room).emit('classroom:moderation:update', {
+      sessionId,
+      mutedUserIds: session.mutedUserIds.map((id) => id.toString()),
+      byUserId: identity.userId,
+    });
+    return safeAck(ack, { ok: true, action, targetUserId, muted: action === 'mute_user' });
+  }
+
+  if (action === 'remove_user') {
+    let removedCount = 0;
+    for (const socketId of targetSockets) {
+      const targetSocket = io.sockets.sockets.get(socketId);
+      if (!targetSocket) continue;
+      if (!targetSocket.rooms.has(room)) continue;
+      await targetSocket.leave(room);
+      targetSocket.data.sessionIds.delete(sessionId);
+      removedCount += 1;
+      targetSocket.emit('classroom:moderation:action', {
+        sessionId,
+        action: 'removed',
+        byUserId: identity.userId,
+      });
+    }
+    io.to(room).emit('classroom:moderation:update', { sessionId, action: 'remove_user', targetUserId, byUserId: identity.userId });
+    return safeAck(ack, { ok: true, action, targetUserId, removedCount });
+  }
+
+  return safeAck(ack, { ok: false, message: 'Unsupported moderation action' });
 }
 
 function resetLiveClassroomSocketState() {
@@ -350,6 +442,11 @@ function initLiveClassroomSocketServer(server, { allowedOrigins, modelOverrides 
     socket.on('webrtc:offer', (payload, ack) => relaySignal(io, socket, 'webrtc:offer', payload, ack));
     socket.on('webrtc:answer', (payload, ack) => relaySignal(io, socket, 'webrtc:answer', payload, ack));
     socket.on('webrtc:ice-candidate', (payload, ack) => relaySignal(io, socket, 'webrtc:ice-candidate', payload, ack));
+    socket.on('classroom:moderation', (payload, ack) => {
+      moderateSession(io, socket, payload, ack).catch((err) => {
+        safeAck(ack, { ok: false, message: err.message });
+      });
+    });
 
     socket.on('disconnect', () => {
       const sessionIds = Array.from(socket.data.sessionIds || []);

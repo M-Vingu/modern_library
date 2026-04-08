@@ -10,6 +10,8 @@ const liveSessionSchema = new mongoose.Schema({
   provider: { type: String, enum: ['jitsi', 'zoom', 'custom'], default: 'jitsi' },
   meetingRoomId: { type: String, trim: true },
   recordingUrl: { type: String, trim: true },
+  roomLocked: { type: Boolean, default: false, index: true },
+  mutedUserIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('LiveSession', liveSessionSchema);
