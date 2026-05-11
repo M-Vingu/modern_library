@@ -18,6 +18,7 @@ const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const { validateEnv } = require('./config/validateEnv');
 const { logger } = require('./utils/logger');
 const { startWorkers } = require('./jobs/worker');
+const { startAiMaintenanceScheduler } = require('./jobs/aiMaintenanceScheduler');
 
 const User = require('./models/user');
 const Wallet = require('./models/wallet');
@@ -28,6 +29,7 @@ validateEnv();
 const app = express();
 const server = http.createServer(app);
 const SECRET = process.env.JWT_SECRET;
+const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map((origin) => origin.trim())
@@ -71,9 +73,12 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
+  exposedHeaders: ['X-Request-Id'],
+  maxAge: 86400,
+  optionsSuccessStatus: 204,
 }));
-app.use(express.json({ limit: '32kb' }));
-app.use(express.urlencoded({ extended: true, limit: '32kb' }));
+app.use(express.json({ limit: isProduction ? '16kb' : '32kb' }));
+app.use(express.urlencoded({ extended: true, limit: isProduction ? '16kb' : '32kb' }));
 app.use(sanitizeRequest);
 app.use(createRateLimiter({ windowMs: 15 * 60 * 1000, max: 300, keyPrefix: 'global' }));
 
@@ -163,6 +168,7 @@ mongoose.connect(process.env.MONGO_URI, {
       startWorkers();
       logger.info('Background workers started in API process');
     }
+    startAiMaintenanceScheduler({ role: 'api' });
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
   })

@@ -4,7 +4,8 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
-const { bookCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
+const { bookCreateSchema } = require('../validations/bookSchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
 const {
   getBooks,
   addBook,

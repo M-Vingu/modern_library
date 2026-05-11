@@ -7,7 +7,7 @@ const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const { validateRequest } = require('../middleware/validateRequest');
-const { userRegisterSchema, userLoginSchema } = require('../validations/legacySchemas');
+const { userRegisterSchema, userLoginSchema } = require('../validations/userSchemas');
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,

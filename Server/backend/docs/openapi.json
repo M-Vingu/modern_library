@@ -231,7 +231,7 @@
     "/api/ai/chat": {
       "post": {
         "tags": ["AI"],
-        "summary": "AI tutor chat",
+        "summary": "AI tutor chat with grounded resource suggestions and persisted session history",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -242,20 +242,329 @@
                 "required": ["message"],
                 "properties": {
                   "message": { "type": "string", "minLength": 1 },
-                  "context": { "type": "object" }
+                  "sessionId": { "type": "string", "example": "50f4533e-4baa-40cc-aec1-8c25381eca39" },
+                  "promptVersion": { "type": "string", "example": "ai-tutor-rag-v2" },
+                  "context": { "type": "object" },
+                  "resourceSelections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": { "type": "string", "enum": ["book", "course", "past_paper"] },
+                        "resourceId": { "type": "string" }
+                      }
+                    }
+                  },
+                  "history": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": { "type": "string", "enum": ["user", "assistant", "system"] },
+                        "content": { "type": "string" },
+                        "timestamp": { "type": "string", "format": "date-time" }
+                      }
+                    }
+                  }
                 }
               },
               "example": {
                 "message": "Teach me binary search.",
-                "context": { "level": "beginner" }
+                "sessionId": "50f4533e-4baa-40cc-aec1-8c25381eca39",
+                "promptVersion": "ai-tutor-rag-v2",
+                "context": { "level": "beginner" },
+                "resourceSelections": [
+                  { "resourceType": "course", "resourceId": "680f33193a46fef002987abc" }
+                ],
+                "history": [
+                  { "role": "user", "content": "I am studying algorithms." },
+                  { "role": "assistant", "content": "Let's focus on search techniques first." }
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "AI response returned" },
+          "200": {
+            "description": "AI response returned",
+            "content": {
+              "application/json": {
+                "example": {
+                  "provider": "mock",
+                  "reply": "For Algorithms, I'd anchor your work around the course \"Algorithms Bootcamp\", use the book \"Binary Search Essentials\" for concept review, and practice with \"Binary Search CAT 2025\".",
+                  "guidance": [
+                    "Study the key idea from \"Algorithms Bootcamp\" first, then summarize it in your own words.",
+                    "Pull examples or definitions from \"Binary Search Essentials\" and turn them into quick recall notes.",
+                    "Use \"Binary Search CAT 2025\" as a timed practice checkpoint after revision."
+                  ],
+                  "tone": "supportive",
+                  "grounded": true,
+                  "sessionId": "50f4533e-4baa-40cc-aec1-8c25381eca39",
+                  "title": "Teach me binary search.",
+                  "summary": "Started with: Teach me binary search. | Latest reply: Start with the concept of a sorted array.",
+                  "status": "active",
+                  "history": [
+                    { "role": "user", "content": "Teach me binary search.", "timestamp": "2026-04-24T08:00:00.000Z" },
+                    { "role": "assistant", "content": "For Algorithms, I'd anchor your work around the course \"Algorithms Bootcamp\".", "timestamp": "2026-04-24T08:00:01.000Z" }
+                  ],
+                  "resources": {
+                    "books": [{ "id": "book-1", "type": "book", "title": "Binary Search Essentials", "summary": "A. Teacher | Algorithms", "availableCopies": 5 }],
+                    "courses": [{ "id": "course-1", "type": "course", "title": "Algorithms Bootcamp", "summary": "Instructor: Dr. Ada | Price: 0 KES" }],
+                    "pastPapers": [{ "id": "paper-1", "type": "past_paper", "title": "Binary Search CAT 2025", "summary": "Computer Science | Algorithms | 2025", "verified": true, "year": 2025 }]
+                  }
+                }
+              }
+            }
+          },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/ai/conversations/{sessionId}": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "Fetch persisted AI tutor conversation messages for a session",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation history returned",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "sessionId": "50f4533e-4baa-40cc-aec1-8c25381eca39",
+                  "title": "Teach me binary search.",
+                  "summary": "Started with: Teach me binary search. | Latest reply: Start with the concept of a sorted array.",
+                  "status": "active",
+                  "archivedAt": null,
+                  "history": [
+                    { "role": "user", "content": "Teach me binary search.", "timestamp": "2026-04-24T08:00:00.000Z" },
+                    { "role": "assistant", "content": "Start with the concept of a sorted array.", "timestamp": "2026-04-24T08:00:01.000Z" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/ai/conversations": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "List the authenticated user's AI tutor conversation sessions",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 } },
+          { "name": "q", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Case-insensitive filter against stored session message content" },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string", "enum": ["active", "archived"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation sessions returned",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "totalCount": 12,
+                  "currentPage": 1,
+                  "totalPages": 2,
+                  "hasNextPage": true,
+                  "hasPreviousPage": false,
+                  "query": "binary",
+                  "items": [
+                    {
+                      "sessionId": "50f4533e-4baa-40cc-aec1-8c25381eca39",
+                      "title": "Teach me binary search.",
+                      "summary": "Started with: Teach me binary search. | Latest reply: Start with the concept of a sorted array.",
+                      "lastMessagePreview": "Start with the concept of a sorted array.",
+                      "messageCount": 6,
+                      "latestMessageRole": "assistant",
+                      "latestMessageAt": "2026-04-24T08:09:00.000Z",
+                      "createdAt": "2026-04-24T08:00:00.000Z",
+                      "updatedAt": "2026-04-24T08:10:00.000Z"
+                    },
+                    {
+                      "sessionId": "ea5256ff-8d26-4d1f-b4c5-e3ba5d59ad56",
+                      "title": "Help me study derivatives",
+                      "summary": "Started with: Help me study derivatives | Latest reply: Let's review differentiation rules next.",
+                      "lastMessagePreview": "Let's review differentiation rules next.",
+                      "messageCount": 4,
+                      "latestMessageRole": "assistant",
+                      "latestMessageAt": "2026-04-23T10:11:00.000Z",
+                      "createdAt": "2026-04-23T10:00:00.000Z",
+                      "updatedAt": "2026-04-23T10:12:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/ai/telemetry/report": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "Admin AI telemetry analytics report",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "range", "in": "query", "required": false, "schema": { "type": "string", "enum": ["daily", "weekly", "monthly"], "default": "daily" } },
+          { "name": "endpoint", "in": "query", "required": false, "schema": { "type": "string", "example": "ai.chat" } },
+          { "name": "from", "in": "query", "required": false, "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "required": false, "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telemetry report returned",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "range": "weekly",
+                  "window": {
+                    "from": "2026-04-24T00:00:00.000Z",
+                    "to": "2026-05-01T00:00:00.000Z"
+                  },
+                  "summary": {
+                    "totalRequests": 12,
+                    "successCount": 10,
+                    "fallbackCount": 2,
+                    "openAiCount": 7,
+                    "mockCount": 5,
+                    "avgResponseTimeMs": 880,
+                    "avgTokensPerSession": 410,
+                    "totalTokens": 4920
+                  },
+                  "endpointBreakdown": [
+                    {
+                      "endpoint": "ai.chat",
+                      "requests": 10,
+                      "successCount": 9,
+                      "fallbackCount": 1,
+                      "avgResponseTimeMs": 820,
+                      "totalTokens": 4300
+                    }
+                  ],
+                  "providerTrend": [
+                    { "bucket": "2026-04-30", "provider": "openai", "requests": 4, "fallbackCount": 0, "avgResponseTimeMs": 760 },
+                    { "bucket": "2026-04-30", "provider": "mock", "requests": 2, "fallbackCount": 2, "avgResponseTimeMs": 120 }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/ai/admin/resummarize": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Admin trigger for AI session maintenance and re-summarization",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": { "type": "string" },
+                  "status": { "type": "string", "enum": ["active", "archived"] },
+                  "inactiveDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                  "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+                }
+              },
+              "example": {
+                "inactiveDays": 30,
+                "limit": 20
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Maintenance batch completed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "processedCount": 2,
+                  "updatedCount": 2,
+                  "failedCount": 0,
+                  "items": [
+                    {
+                      "sessionId": "50f4533e-4baa-40cc-aec1-8c25381eca39",
+                      "provider": "openai",
+                      "fallbackUsed": false,
+                      "status": "archived",
+                      "title": "Binary search revision",
+                      "summary": "Focused on binary search concepts and practice.",
+                      "success": true
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/ai/admin/backfill-conversations": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Admin backfill for AI conversation consistency",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": { "type": "string" },
+                  "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
+                  "dryRun": { "type": "boolean" }
+                }
+              },
+              "example": {
+                "dryRun": true,
+                "limit": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill run completed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "scannedCount": 2,
+                  "changedCount": 1,
+                  "unchangedCount": 1,
+                  "dryRun": true,
+                  "items": [
+                    { "sessionId": "session-a", "changed": true, "fields": ["title", "summary"] },
+                    { "sessionId": "session-b", "changed": false, "fields": [] }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
         }
       }
     },
@@ -576,6 +885,46 @@
       }
     },
 
+    "/api/queues/report": {
+      "get": {
+        "tags": ["Queues"],
+        "summary": "Queue overview report",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Aggregated queue report",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "redisConfigured": true,
+                  "scheduler": {
+                    "enabled": true,
+                    "role": "api",
+                    "cron": "*/30 * * * *",
+                    "inactiveDays": 30,
+                    "batchLimit": 20,
+                    "retryAttempts": 3,
+                    "retryDelayMs": 1500
+                  },
+                  "items": [
+                    {
+                      "queueName": "ai-session-maintenance",
+                      "available": true,
+                      "counts": { "active": 0, "completed": 5, "failed": 1, "waiting": 2, "delayed": 0 },
+                      "deadLetter": {
+                        "available": true,
+                        "counts": { "active": 0, "completed": 0, "failed": 0, "waiting": 0, "delayed": 0 }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queues/{name}/metrics": {
       "get": {
         "tags": ["Queues"],
@@ -590,7 +939,7 @@
         "tags": ["Queues"],
         "summary": "Replay dead-letter job",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "enum": ["settlement-generation", "file-post-processing", "notifications", "retention-sweep"] } }],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "enum": ["settlement-generation", "file-post-processing", "notifications", "retention-sweep", "ai-session-maintenance"] } }],
         "requestBody": {
           "required": true,
           "content": {
@@ -610,6 +959,68 @@
         },
         "responses": {
           "200": { "description": "Replayed" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/queues/{name}/dispatch": {
+      "post": {
+        "tags": ["Queues"],
+        "summary": "Dispatch an AI maintenance job to the queue",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "enum": ["ai-session-maintenance"] } }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": { "type": "string" },
+                  "status": { "type": "string", "enum": ["active", "archived"] },
+                  "inactiveDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                  "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                  "retryAttempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+                  "retryDelayMs": { "type": "integer", "minimum": 1, "maximum": 60000 },
+                  "archiveInactive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Dispatched" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/queues/{name}/run-now": {
+      "post": {
+        "tags": ["Queues"],
+        "summary": "Force-run AI maintenance immediately",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "enum": ["ai-session-maintenance"] } }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": { "type": "string" },
+                  "status": { "type": "string", "enum": ["active", "archived"] },
+                  "inactiveDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                  "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                  "retryAttempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+                  "retryDelayMs": { "type": "integer", "minimum": 1, "maximum": 60000 },
+                  "archiveInactive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Run completed" },
           "400": { "$ref": "#/components/responses/BadRequest" }
         }
       }

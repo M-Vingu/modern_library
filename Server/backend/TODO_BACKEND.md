@@ -13,6 +13,7 @@
 - API docs refresh and architecture/phase docs updates.
 - Full validation coverage on legacy mutation routes (auth/user/ai/books/courses/products/rides/hostels/past-papers/partners/live-classroom/queue/compliance sweep).
 - OpenAPI request/response examples added for newly validated legacy mutation endpoints and standardized error components.
+- Backend cleanup pass completed with validation barrel consolidation and full Node test suite green.
 
 ## In Progress
 - Credential onboarding for MFA delivery providers (SMTP/Twilio adapters are implemented).

@@ -3,7 +3,8 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware'); // JWT middleware
 const { validateRequest } = require('../middleware/validateRequest');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
-const { hostelCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
+const { hostelCreateSchema } = require('../validations/hostelSchemas');
 const {
   getHostels,
   createHostel,

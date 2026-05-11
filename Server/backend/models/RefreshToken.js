@@ -4,7 +4,7 @@ const refreshTokenSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   sessionId: { type: String, required: true, index: true },
   tokenHash: { type: String, required: true, unique: true, index: true },
-  expiresAt: { type: Date, required: true, index: true },
+  expiresAt: { type: Date, required: true },
   revokedAt: { type: Date },
   replacedByTokenHash: { type: String },
   createdByIp: { type: String },

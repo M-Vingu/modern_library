@@ -4,15 +4,16 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
-const { cabBookingSchema, partnerStatusSchema } = require('../validations/partnerSchemas');
 const {
+  cabBookingSchema,
+  partnerStatusSchema,
   partnerOnboardSchema,
   cabVehicleCreateSchema,
   cabBookingStatusSchema,
   accommodationCreateSchema,
   accommodationApplySchema,
   accommodationStatusSchema,
-} = require('../validations/legacySchemas');
+} = require('../validations/partnerSchemas');
 const { idempotencyMiddleware } = require('../middleware/idempotency');
 const {
   createPartnerOnboarding,

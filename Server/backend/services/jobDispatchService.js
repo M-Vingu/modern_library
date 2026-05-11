@@ -12,8 +12,13 @@ async function enqueueNotification(payload) {
   return enqueue('notifications', 'send-notification', payload);
 }
 
+async function enqueueAiSessionMaintenance(payload, options) {
+  return enqueue('ai-session-maintenance', 'resummarize-sessions', payload, options);
+}
+
 module.exports = {
   enqueueSettlementGeneration,
   enqueueFilePostProcessing,
   enqueueNotification,
+  enqueueAiSessionMaintenance,
 };

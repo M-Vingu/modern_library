@@ -21,8 +21,9 @@ const {
   mfaChallengeSchema,
   mfaVerifySchema,
   sessionRevokeSchema,
+  logoutSchema,
+  revokeAllSchema,
 } = require('../validations/authSchemas');
-const { logoutSchema, revokeAllSchema } = require('../validations/legacySchemas');
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -100,7 +101,7 @@ router.post('/register', authLimiter, validateRequest(registerSchema), async (re
   try {
     if (!SECRET) return fail(res, 500, 'AUTH_SECRET_MISSING', 'JWT secret not configured');
 
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
     const normalizedEmail = String(email).trim().toLowerCase();
 
     const existing = await User.findOne({ email: normalizedEmail });
@@ -111,7 +112,7 @@ router.post('/register', authLimiter, validateRequest(registerSchema), async (re
       name,
       email: normalizedEmail,
       password: hashed,
-      role: role || 'user',
+      role: 'student',
       referralCode: Math.random().toString(36).substring(2, 8),
     });
 

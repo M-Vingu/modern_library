@@ -1,4 +1,5 @@
 const { logger } = require('../utils/logger');
+const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 
 function notFoundHandler(req, res) {
   if (typeof res.fail === 'function') {
@@ -10,15 +11,12 @@ function notFoundHandler(req, res) {
 function errorHandler(err, req, res, _next) {
   const status = err.status || 500;
   const code = err.code || (status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR');
-  const message = err.message || 'Internal server error';
+  const message = status >= 500 && isProduction
+    ? 'Internal server error'
+    : (err.message || 'Internal server error');
 
   logger.error({
-    err: {
-      message: err.message,
-      stack: err.stack,
-      code: err.code,
-      status: err.status,
-    },
+    err,
     requestId: req.requestId,
     path: req.originalUrl,
     method: req.method,

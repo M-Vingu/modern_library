@@ -42,10 +42,10 @@ function getQueue(name) {
   return queue;
 }
 
-async function enqueue(queueName, jobName, payload) {
+async function enqueue(queueName, jobName, payload, options = {}) {
   const queue = getQueue(queueName);
   if (!queue) return { queued: false, reason: 'redis_not_configured' };
-  const job = await queue.add(jobName, payload);
+  const job = await queue.add(jobName, payload, options);
   return { queued: true, jobId: job.id };
 }
 
@@ -67,4 +67,27 @@ async function getQueueMetrics(queueName) {
   return { available: true, queueName, counts };
 }
 
-module.exports = { getQueue, enqueue, replayDeadLetter, getQueueMetrics };
+async function getQueueReport(queueName) {
+  const metrics = await getQueueMetrics(queueName);
+  const deadLetterMetrics = await getQueueMetrics(`${queueName}:dead-letter`);
+
+  return {
+    queueName,
+    available: metrics.available,
+    reason: metrics.reason,
+    counts: metrics.counts || null,
+    deadLetter: {
+      available: deadLetterMetrics.available,
+      reason: deadLetterMetrics.reason,
+      counts: deadLetterMetrics.counts || null,
+    },
+  };
+}
+
+module.exports = {
+  getQueue,
+  enqueue,
+  replayDeadLetter,
+  getQueueMetrics,
+  getQueueReport,
+};

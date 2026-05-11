@@ -130,7 +130,7 @@ async function financeSummary(req, res) {
   const [pending, processing, paid] = await Promise.all([
     SettlementLedger.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, gross: { $sum: '$grossAmount' }, payout: { $sum: '$partnerPayout' }, commission: { $sum: '$commissionAmount' } } }]),
     SettlementLedger.aggregate([{ $match: { status: 'processing' } }, { $group: { _id: null, gross: { $sum: '$grossAmount' }, payout: { $sum: '$partnerPayout' }, commission: { $sum: '$commissionAmount' } } }]),
-    SettlementLedger.aggregate([{ $match: { status: 'paid' } }, { $group: { _id: null, gross: { $sum: '$grossAmount' }, payout: { $sum: '$partnerPayout' }, commission: { $sum: '$commissionAmount' } } }]),
+    SettlementLedger.aggregate([{ $match: { status: { $in: ['paid', 'settled'] } } }, { $group: { _id: null, gross: { $sum: '$grossAmount' }, payout: { $sum: '$partnerPayout' }, commission: { $sum: '$commissionAmount' } } }]),
   ]);
 
   return res.json({

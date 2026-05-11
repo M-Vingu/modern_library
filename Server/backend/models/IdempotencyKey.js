@@ -7,7 +7,7 @@ const idempotencyKeySchema = new mongoose.Schema({
   method: { type: String, required: true },
   statusCode: { type: Number, required: true },
   responseBody: { type: Object, required: true },
-  expiresAt: { type: Date, required: true, index: true },
+  expiresAt: { type: Date, required: true },
 }, { timestamps: true });
 
 idempotencyKeySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

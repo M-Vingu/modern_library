@@ -11,8 +11,8 @@ const {
   buyListing,
 } = require('../controllers/marketplaceController');
 const { validateRequest } = require('../middleware/validateRequest');
-const { createListingSchema } = require('../validations/marketplaceSchemas');
-const { marketplaceUpdateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
+const { createListingSchema, marketplaceUpdateSchema } = require('../validations/marketplaceSchemas');
 const { idempotencyMiddleware } = require('../middleware/idempotency');
 
 router.get('/', listListings);

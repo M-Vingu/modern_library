@@ -7,9 +7,9 @@ const { validateRequest } = require('../middleware/validateRequest');
 const {
   pastPaperCreateSchema,
   pastPaperUploadSchema,
-  idParamOnlySchema,
   pastPaperVerifySchema,
-} = require('../validations/legacySchemas');
+} = require('../validations/pastPaperSchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
 const {
   createPastPaper,
   uploadPastPaper,

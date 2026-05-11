@@ -2,8 +2,11 @@ const User = require('../models/user');
 const { createWallet } = require('./walletController');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const RefreshToken = require('../models/RefreshToken');
 
 const SECRET = process.env.JWT_SECRET;
+const REFRESH_TTL_SEC = Number(process.env.REFRESH_TOKEN_TTL_SEC || 60 * 60 * 24 * 30);
 
 function getJwtSignOptions() {
   const options = {
@@ -15,6 +18,37 @@ function getJwtSignOptions() {
   return options;
 }
 
+function hashToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function issueAccessToken(user, sessionId) {
+  return jwt.sign(
+    {
+      id: user._id,
+      role: user.role || 'student',
+      sid: sessionId,
+      tver: user.tokenVersion || 0,
+    },
+    SECRET,
+    getJwtSignOptions(),
+  );
+}
+
+async function issueRefreshToken(userId, ip, sessionId) {
+  const raw = crypto.randomBytes(48).toString('hex');
+  const tokenHash = hashToken(raw);
+  const expiresAt = new Date(Date.now() + REFRESH_TTL_SEC * 1000);
+  await RefreshToken.create({
+    userId,
+    tokenHash,
+    sessionId,
+    expiresAt,
+    createdByIp: ip,
+  });
+  return { token: raw, expiresAt, sessionId };
+}
+
 
 // ==========================
 // REGISTER
@@ -24,9 +58,6 @@ async function register(req, res) {
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'name, email and password are required' });
-    }
-    if (String(password).length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
     if (!SECRET) return res.status(500).json({ message: 'JWT secret not configured' });
 
@@ -46,6 +77,7 @@ async function register(req, res) {
       name,
       email: normalizedEmail,
       password: hashedPassword,
+      role: 'student',
       referralCode: Math.random().toString(36).substring(2, 8)
     });
 
@@ -57,17 +89,18 @@ async function register(req, res) {
     await user.save();
 
     // 🔐 Generate token
-    const token = jwt.sign(
-      { id: user._id },
-      SECRET,
-      getJwtSignOptions()
-    );
+    const sessionId = crypto.randomUUID();
+    const token = issueAccessToken(user, sessionId);
+    const refresh = await issueRefreshToken(user._id, req.ip, sessionId);
 
     res.status(201).json({
       message: 'User registered successfully',
       user,
       wallet,
-      token
+      token,
+      refreshToken: refresh.token,
+      refreshExpiresAt: refresh.expiresAt,
+      sessionId,
     });
 
   } catch (err) {
@@ -103,16 +136,17 @@ async function login(req, res) {
     await user.save();
 
     // 🔐 Generate token
-    const token = jwt.sign(
-      { id: user._id },
-      SECRET,
-      getJwtSignOptions()
-    );
+    const sessionId = crypto.randomUUID();
+    const token = issueAccessToken(user, sessionId);
+    const refresh = await issueRefreshToken(user._id, req.ip, sessionId);
 
     res.json({
       message: 'Login successful',
       user: user.toJSON(),
-      token
+      token,
+      refreshToken: refresh.token,
+      refreshExpiresAt: refresh.expiresAt,
+      sessionId,
     });
 
   } catch (err) {

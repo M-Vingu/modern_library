@@ -8,7 +8,8 @@ const Wallet = require('../models/wallet');
 const protect = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
-const { courseCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
+const { courseCreateSchema } = require('../validations/courseSchemas');
 
 // GET all courses
 router.get('/', async (req, res) => {

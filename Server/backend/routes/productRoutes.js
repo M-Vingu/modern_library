@@ -7,7 +7,8 @@ const Wallet = require('../models/wallet');
 const protect = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
-const { productCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
+const { productCreateSchema } = require('../validations/productSchemas');
 
 // GET all products
 router.get('/', async (req, res) => {

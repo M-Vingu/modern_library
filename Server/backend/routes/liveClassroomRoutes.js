@@ -7,7 +7,7 @@ const {
   liveClassroomCreateSchema,
   liveClassroomSessionCreateSchema,
   sessionIdParamSchema,
-} = require('../validations/legacySchemas');
+} = require('../validations/liveClassroomSchemas');
 const {
   createClassroom,
   listClassrooms,

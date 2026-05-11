@@ -4,7 +4,8 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const { validateRequest } = require('../middleware/validateRequest');
-const { rideCreateSchema, idParamOnlySchema } = require('../validations/legacySchemas');
+const { idParamOnlySchema } = require('../validations/commonSchemas');
+const { rideCreateSchema } = require('../validations/rideSchemas');
 const {
   getRides,
   createRide,

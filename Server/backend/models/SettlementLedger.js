@@ -10,7 +10,12 @@ const settlementLedgerSchema = new mongoose.Schema({
   commissionAmount: { type: Number, required: true, min: 0 },
   partnerPayout: { type: Number, required: true, min: 0 },
   currency: { type: String, enum: ['KES', 'USD', 'EUR', 'GBP'], default: 'KES' },
-  status: { type: String, enum: ['pending', 'settled', 'reversed'], default: 'pending', index: true },
+  status: {
+    type: String,
+    enum: ['pending', 'processing', 'paid', 'failed', 'reversed', 'settled'],
+    default: 'pending',
+    index: true,
+  },
   notes: { type: String, trim: true },
   settledAt: Date,
 }, { timestamps: true });

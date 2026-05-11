@@ -5,7 +5,7 @@ const mfaChallengeSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   method: { type: String, enum: ['totp', 'email_otp'], required: true },
   codeHash: { type: String, required: true },
-  expiresAt: { type: Date, required: true, index: true },
+  expiresAt: { type: Date, required: true },
   usedAt: { type: Date },
 }, { timestamps: true });
 

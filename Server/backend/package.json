@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test --test-concurrency=1 --test-isolation=none tests/**/*.test.js",
-    "worker": "node jobs/runWorker.js"
+    "worker": "node jobs/runWorker.js",
+    "ai:backfill-conversations": "node scripts/backfillAiConversations.js",
+    "smoke:first-user": "node scripts/smokeTestFirstUser.js"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +25,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.0",
     "mongoose": "^9.3.2",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
